@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 28 16:53:36 2025
+
+@author: nicholas.lusk
+"""
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aind-smartspim-transform-utils"
+description = "Transforms coordinates between SmartSPIM template and CCFv3"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Allen Institute for Neural Dynamics"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3"
+]
+readme = "README.md"
+dynamic = ["version"]
+
+dependencies = [
+    'ome-zarr==0.8.3',
+    'numpy==1.26.4',
+    'zarr==2.18.0',
+    'scikit-learn==1.4.2',
+    'pims==0.6.1',
+    'imagecodecs[all]==2024.1.1',
+    'tifffile==2024.5.10',
+    'dask[distributed]==2024.4.1',
+    'dask_image==2023.8.1',
+    'torch==2.2.2'
+    
+    'antspyx==0.4.2',
+    'numpy==1.24.0'
+]
+
+[project.optional-dependencies]
+dev = [
+    'black',
+    'coverage',
+    'flake8',
+    'interrogate',
+    'isort',
+    'Sphinx',
+    'furo'
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "aind_large_scale_prediction.__version__"}
+
+[tool.black]
+line-length = 79
+target_version = ['py36']
+exclude = '''
+
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | build
+    | dist
+  )/
+  | .gitignore
+)
+'''
+
+[tool.coverage.run]
+omit = ["*__init__*"]
+source = ["aind_large_scale_prediction", "tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__ == .__main__.:",
+    "from",
+    "import",
+    "pragma: no cover"
+]
+fail_under = 100
+
+[tool.isort]
+line_length = 79
+profile = "black"
+
+[tool.interrogate]
+exclude = ["setup.py", "docs", "build"]
+fail-under = 100
