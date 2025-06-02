@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aind-smartspim-transform-utils"
 description = "Transforms coordinates between SmartSPIM template and CCFv3"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.9"
 authors = [
     {name = "Allen Institute for Neural Dynamics"}
