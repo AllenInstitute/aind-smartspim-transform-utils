@@ -7,8 +7,8 @@ Created on Wed May 28 16:21:46 2025
 """
 
 import os
-import ants
 import numpy as np
+import dask as da
 
 from glob import glob
 
@@ -124,6 +124,7 @@ class CoordinateTransform():
     def forward_transform(
         self, 
         coordinates: np.array,
+        input_img: da.array,
         registration_ds: int
     ) -> np.array:
         """
