@@ -7,6 +7,9 @@ Created on Fri May 30 14:20:43 2025
 """
 
 import os
+import numpy as np
+import dask.array as da
+
 from aind_smartspim_transform_utils.io import file_io as fio
 
 
@@ -36,9 +39,6 @@ def check_layer_info(ng_data, layer_name):
         
     
     
-    
-    
-
 def read_neuroglancer_json(filepath: str, layer_name: str) -> dict:
     """
     Takes a neuroglancer JSON and retrieves coordinates from a
@@ -47,41 +47,21 @@ def read_neuroglancer_json(filepath: str, layer_name: str) -> dict:
     Parameters
     ----------
     filepath : str
-        DESCRIPTION.
-    layer_name : str
-        DESCRIPTION.
+        The neuroiglancer state.json of the dataset you would like to transform
+        pointswfrom
 
     Returns
     -------
-    coordinates : TYPE
-        DESCRIPTION.
+    dict
+        returns the neuroglancer data as a dictionary
 
     """
     
     if not os.path.exists(filepath):
         FileNotFoundError(f"{filepath} does not exist")
     
-    
-    neuroglancer_data = fio.read_json_as_dict(filepath)
-    
-    layer_names = [layers['name'] for layers in neuroglancer_data['layers']] 
-
-    if layer_name in layer_names:
-        cells = []
-        for layers in neuroglancer_data['layers']:
-            if layers['name'] == layer_name:
-                for cell in layers['annotations']:
-                    cells.append(
-                        [
-                            cell['point'][0],
-                            cell['point'][1],
-                            cell['point'][2]
-                        ]
-                    )
-    else:
-        ValueError(f"There is no layer named {layer_name} in neuroglancer data")
         
-    return neuroglancer_data
+    return fio.read_json_as_dict(filepath)
         
 def get_neuroglancer_annotation_points(
     neuroglancer_data: dict, 
@@ -106,16 +86,17 @@ def get_neuroglancer_annotation_points(
         A list of floats that specify the resolutiuon unit of the points.
         By default the points correspond to voxel location so no spacing is 
         needed. Default: None
-    
+    """
     
     layer_names = [layers['name'] for layers in neuroglancer_data['layers']] 
 
     if layer_name not in layer_names:
         ValueError(f"There is no layer named {layer_name} in neuroglancer data")
-        
+    
+    layer = [layers for layers in neuroglancer_data['layers'] if layer_name==layers["name"]] 
 
     points = []
-    annotations = layer.get("annotations", [])
+    annotations = layer[0].get("annotations", [])
     for annotation in annotations:
         point_arr = np.array(annotation.get("point", []), dtype=float)
         if point_arr.shape[0] != 4:
@@ -128,27 +109,36 @@ def get_neuroglancer_annotation_points(
     if spacing is not None:
         points = points * spacing
 
-    if return_description:
-        descriptions = [
-            annotation.get("description", None) for annotation in annotations
-        ]
-        return points, np.array(descriptions, dtype=object)
-    return points, None
+    return points
 
-def get_neuroglancer_metadata(neuroglancer_data: dict) -> dict:
+def get_neuroglancer_image(neuroglancer_data: dict, layer_name: str) -> da.array:
     """
-    Retrive necessary data from neuroglancer JSON for transforming
-    points
-    """
+    Gets a dask array for an image specified from the layer name
 
     Parameters
     ----------
     neuroglancer_data : dict
-        DESCRIPTION.
+        A dictionary of the neuroglancer state imported from a JSON
+    layer_name : str
+        The name of the layer that you are retrieving points
 
     Returns
     -------
-    dict
-        DESCRIPTION.
+    image : da.array
+        dask array of the specified layer
 
     """
+    
+    layer_names = [layers['name'] for layers in neuroglancer_data['layers']] 
+    
+    if layer_name not in layer_names:
+        ValueError(f"There is no layer named {layer_name} in neuroglancer data")
+    
+    for layer in neuroglancer_data['layers']:
+        if layer['name'] == layer_name and layer['type'] == "image":
+            image = da.from_zarr(layer['source'], '0').squeeze()
+            
+    
+    return image
+    
+    

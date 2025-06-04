@@ -82,6 +82,43 @@ def get_orientation_transform(orientation_in: str, orientation_out: str) -> tupl
 
     return original, swapped, transform_matrix
 
+def calculate_scaling(
+        image_res: list, 
+        downsample: int, 
+        ccf_res: int, 
+        direction: str
+) -> list:
+    """
+    
+
+    Parameters
+    ----------
+    image_res : list
+        DESCRIPTION.
+    downsample : int
+        DESCRIPTION.
+    ccf_res : int
+        DESCRIPTION.
+    direction : str
+        DESCRIPTION.
+
+    Returns
+    -------
+    list
+        DESCRIPTION.
+
+    """
+    
+    ds_res = [res * downsample for res in image_res]
+    
+    if direction =='forward':
+        values = zip(ds_res, [ccf_res] * 3)
+    elif direction == 'reverse':
+        values = zip([ccf_res] * 3, ds_res)
+        
+    return [res_1/res_2 for res_1, res_2 in values]
+    
+
 def scale_points(points: list, scale: list) -> np.ndarray:
     """
     Takes the downsampled cells, scales and orients them in smartspim template
