@@ -223,7 +223,7 @@ def _parse_acquisition_data(manifest: dict):
     """
     
     orientation = manifest['prelim_acquisition']['axes']
-    resolution = manifest['pipeline_processing']['resolution']
+    resolution = manifest['pipeline_processing']['stitching']['resolution']
     
     for c, axis in enumerate(orientation):
         for res in resolution:
