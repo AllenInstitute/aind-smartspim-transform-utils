@@ -344,7 +344,7 @@ class CoordinateTransform():
         reg_dims = [dim / 2**reg_ds for dim in input_shape]
         
         # flip axis based on the template orientation relative to input image
-        orient = utils.get_orientation(self.orientation)
+        orient = utils.get_orientation(self.acquisition)
         
         _, swapped, mat = utils.get_orientation_transform(
             orient, self.template_info["orientation"]
@@ -354,6 +354,8 @@ class CoordinateTransform():
             if dim_orient < 0:
                 points_ds[:, idx] = reg_dims[idx] - points_ds[:, idx]
         
+        
+        image_res = [dim['resolution'] for dim in self.acquisition]
         
         #scale points and orient axes to template
         scaling = utils.calculate_scaling(
