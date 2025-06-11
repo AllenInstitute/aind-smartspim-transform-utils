@@ -347,7 +347,7 @@ class CoordinateTransform():
         orient = utils.get_orientation(self.acquisition)
         
         _, swapped, mat = utils.get_orientation_transform(
-            orient, self.template_info["orientation"]
+            orient, self.ls_template_info["orientation"]
         )
         
         for idx, dim_orient in enumerate(mat.sum(axis=1)):
