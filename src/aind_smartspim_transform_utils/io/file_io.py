@@ -51,7 +51,7 @@ def get_transforms(transforms_path: str):
     transforms = {}
     
     try:
-        transforms['pts_to_ccf'] = [
+        transforms['points_to_ccf'] = [
                 glob(os.path.join(transforms_path, '*SyN_0GenericAffine.mat'))[0],
                 glob(os.path.join(transforms_path, '*InverseWarp.nii.gz'))[0],
         ]
@@ -59,7 +59,7 @@ def get_transforms(transforms_path: str):
         FileNotFoundError("Could not find files needed for moving points from light sheet to CCF")
         
     try:
-        transforms['pts_from_ccf'] = [
+        transforms['points_from_ccf'] = [
             glob(os.path.join(transforms_path, '*SyN_1Warp.nii.gz'))[0],
             glob(os.path.join(transforms_path, '*SyN_0GenericAffine.mat'))[0],
         ]
