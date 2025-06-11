@@ -369,7 +369,7 @@ class CoordinateTransform():
         orient_pts = scaled_pts[:, swapped]
         
         # convert points into ccf space
-        ants_pts = utils.convert_to_ants_space(self.template_info, orient_pts)
+        ants_pts = utils.convert_to_ants_space(self.ls_template_info, orient_pts)
         
         template_pts = utils.apply_transforms_to_points(
             ants_pts, 
@@ -384,10 +384,10 @@ class CoordinateTransform():
         )
         
 
-        ccf_pts = utils.convert_from_ants_space(self.ccf_info, ccf_pts)
+        ccf_pts = utils.convert_from_ants_space(self.ccf_template_info, ccf_pts)
         
         _, swapped, _ = utils.get_orientation_transform(
-            self.template_info["orientation"], self.ccf_info["orientation"]
+            self.ls_template_info["orientation"], self.ccf_template_info["orientation"]
         )
         
         transformed_pts = ccf_pts[:, swapped]
