@@ -405,7 +405,7 @@ class CoordinateTransform():
         
         #make sure points are ordered correctly
         cff_order = ['AP', 'DV', 'ML']
-        points = points[cff_order]
+        points = points[cff_order].values
         reg_ds = self.acquisition['registration']['input_scale']
         
         # orient points for transformation
