@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 
 from glob import glob
-from tqdm import tqdm
 
 from aind_smartspim_transform_utils import base_dir
 from aind_smartspim_transform_utils.io import file_io as fio

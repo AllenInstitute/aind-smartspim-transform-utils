@@ -12,7 +12,10 @@ import json
 import ants
 
 import numpy as np
+import pandas as pd
 
+
+from imlib.IO import get_cells
 from glob import glob
 from tqdm import tqdm
 
@@ -140,6 +143,26 @@ def _download_data_from_s3(data_folder: str, files: list, dest: str):
                     f, 
                     Callback=pbar.update
                 )
+                
+def _read_xml_as_df(fpath: str) -> pd.DataFrame:
+    
+
+    file_cells = get_cells(fpath)
+
+    cells = []
+
+    for cell in file_cells:
+        cells.append(                
+            [
+                cell.x,
+                cell.y,
+                cell.z,
+            ]
+        )
+        
+    df = pd.DataFrame(cells, columns=['x', 'y', 'z'])
+
+    return df
     
 def get_transforms(
         dataset_path: str, 
@@ -295,6 +318,41 @@ def get_image_metadata(dataset_path: str, manifest: dict, bucket = None) -> dict
         return _load_data_from_s3([zarr_path], bucket)
     else:
         return _load_data_from_local([zarr_path])
+    
+def load_cell_locations(dataset: str, channel: str) -> pd.DataFrame:
+    
+    cell_path = os.path.join(
+        dataset,
+        'image_cell_segmentation',
+        channel
+    )
+    
+    files = [
+        'detected_cells.csv',
+        'classified_cells.xml',
+        'detected_cells.xml'
+    ]
+    
+    found = False
+    
+    for file in files:
+        
+        fpath = os.path.join(cell_path, file)
+        
+        if os.path.exists(fpath):
+            found = True
+            print(f"Found file {file} in path. Loading cells from here")
+            
+            if 'csv' in file:
+                df = pd.read_csv(fpath, index_col = 0)
+            else:
+                df = _read_xml_as_df(fpath)
+    
+    if not found:
+        raise FileNotFoundError(f"Could not find a cell location file for {dataset}")
+    
+    
+    return df
 
 def load_ants_nifti(filepath: str) -> dict:
     """
