@@ -7,9 +7,8 @@ Created on Wed May 28 16:21:46 2025
 """
 
 import os
-import boto3
 import numpy as np
-import dask.array as da
+import pandas as pd
 
 from glob import glob
 from tqdm import tqdm
@@ -18,17 +17,6 @@ from aind_smartspim_transform_utils import base_dir
 from aind_smartspim_transform_utils.io import file_io as fio
 from aind_smartspim_transform_utils.utils import utils
 
-def _get_client():
-    '''
-    Creates an instance of a s3 client for interacting with AWS
-
-    Returns
-    -------
-    client.s3
-        S3 object of botocore.client module
-
-    '''
-    return boto3.client('s3')
 
 def _check_path(name: str, sub_folder: str):
     
@@ -40,49 +28,6 @@ def _check_path(name: str, sub_folder: str):
     
     return True   
 
-def _download_data(name: str, subfolder: str):
-    
-    dest = os.path.join(base_dir, name, subfolder)
-    client = _get_client()
-    
-    if name.lower() == "smartspim_lca":
-        
-        data_folder = 'SmartSPIM-template_2024-05-16_11-26-14'
-        
-        if subfolder == 'ccf':
-            files = ['ccf_average_template_25.nii.gz']
-        elif subfolder == 'template':
-            files = ['smartspim_lca_template_25.nii.gz']
-        elif subfolder == 'transforms':
-            files = [
-                'spim_template_to_ccf_syn_0GenericAffine_25.mat',
-                'spim_template_to_ccf_syn_1Warp_25.nii.gz',
-                'spim_template_to_ccf_syn_1InverseWarp_25.nii.gz'
-            ]
-            
-        for file in files:
-            fname = os.path.join(dest, file)
-            s3_object_key = f'{data_folder}/{file}'
-            
-            meta_data = client.head_object(Bucket='aind-open-data', Key=s3_object_key)
-            total_len = int(meta_data.get('ContentLength', 0))
-            bar = "{percentage:.1f}%|{bar:25} | {rate_fmt} | {desc}"
-            
-            with tqdm(
-                    total = total_len, 
-                    desc = s3_object_key, 
-                    bar_format=bar, 
-                    unit='B', 
-                    unit_scale = True
-                ) as pbar:
-                
-                with open(fname, 'wb') as f:
-                    client.download_fileobj(
-                        'aind-open-data', 
-                        s3_object_key, 
-                        f, 
-                        Callback=pbar.update
-                    )
     
 def _get_ccf_transforms(name: str) -> dict:
     """
@@ -108,8 +53,16 @@ def _get_ccf_transforms(name: str) -> dict:
         
         file_check = _check_path(name, 'transforms')
         
+        data_folder = 'SmartSPIM-template_2024-05-16_11-26-14'
+        files = [
+            'spim_template_to_ccf_syn_0GenericAffine_25.mat',
+            'spim_template_to_ccf_syn_1Warp_25.nii.gz',
+            'spim_template_to_ccf_syn_1InverseWarp_25.nii.gz'
+        ]
+        dest = os.path.join(base_dir, name.lower(), 'transforms')
+        
         if not file_check:
-            _download_data(name, 'transforms')
+            fio._download_data_from_s3(data_folder, files, dest)
         
         root = os.path.join(base_dir, name, 'transforms')
         
@@ -123,7 +76,7 @@ def _get_ccf_transforms(name: str) -> dict:
             glob(os.path.join(root, '*.mat'))[0]
         ]
     else:
-        ValueError(f"name: {name} is not a currently available transformation")
+        raise ValueError(f"name: {name} is not a currently available transformation")
         
 
     return transforms
@@ -153,14 +106,18 @@ def _get_ccf_template(name):
         
         file_check = _check_path(name, 'ccf')
         
+        data_folder = 'SmartSPIM-template_2024-05-16_11-26-14'
+        files = ['ccf_average_template_25.nii.gz']     
+        dest = os.path.join(base_dir, name.lower(), 'ccf')
+        
         if not file_check:
-            _download_data(name, 'ccf')
+            fio._download_data_from_s3(data_folder, files, dest)
         
         root = os.path.join(base_dir, name, 'ccf')
         
         ants_ccf, ccf_info = fio.load_ants_nifti(f"{root}/ccf_average_template_25.nii.gz")
     else:
-        ValueError(f"name: {name} is not a currently available ccf")  
+        raise ValueError(f"name: {name} is not a currently available ccf")  
     
     
     return ants_ccf, ccf_info
@@ -190,17 +147,34 @@ def _get_ls_template(name):
         
         file_check = _check_path(name, 'template')
         
+        data_folder = 'SmartSPIM-template_2024-05-16_11-26-14'
+        files = ['smartspim_lca_template_25.nii.gz']        
+        dest = os.path.join(base_dir, name.lower(), 'template')
+        
         if not file_check:
-            _download_data(name, 'template')
+            fio._download_data_from_s3(data_folder, files, dest)
         
         root = os.path.join(base_dir, name, 'template')
         
         
         ants_template, template_info = fio.load_ants_nifti(f"{root}/smartspim_lca_template_25.nii.gz")
     else:
-        ValueError(f"name: {name} is not a currently available ccf")  
+        raise ValueError(f"name: {name} is not a currently available ccf")  
     
     return ants_template, template_info
+
+def _fetch_zarr_data(dataset_path: str, channel:str, level: int) -> list:
+    
+    zarr_path = os.path.join(
+        dataset_path,
+        'image_tile_fusing/OMEZarr',
+        channel + '.zarr',
+        str(level),
+        '.zarray'
+    )
+    
+    return fio._read_json_as_dict(zarr_path)
+
 
 def _parse_acquisition_data(manifest: dict):
     """
@@ -223,15 +197,22 @@ def _parse_acquisition_data(manifest: dict):
     """
     
     orientation = manifest['prelim_acquisition']['axes']
-    resolution = manifest['pipeline_processing']['stitching']['resolution']
+    pipeline_processing = manifest['pipeline_processing']
     
     for c, axis in enumerate(orientation):
-        for res in resolution:
+        for res in pipeline_processing['stitching']['resolution']:
             if res['axis_name'] == axis['name']:
                 axis['resolution'] = res['resolution']
                 orientation[c] = axis
                 
-    return orientation
+    acquisition = {
+        'orientation': orientation,
+        'registration': pipeline_processing['registration'],
+        'segmentation': pipeline_processing['segmentation'],
+        'channels': [v for k, v in manifest['channel_translation']]
+    }
+                
+    return acquisition
 
 
 def get_dataset_transforms(manifest_path: str) -> dict:
@@ -259,14 +240,14 @@ def get_dataset_transforms(manifest_path: str) -> dict:
     transforms = {}
     
     if not os.path.exists(manifest_path):
-        FileExistsError(f"{manifest_path} does not exist.")
+        raise FileExistsError(f"{manifest_path} does not exist.")
         
         
     manifest, transforms = fio.get_transforms(manifest_path)
         
     
     return manifest, transforms
-    
+
 class CoordinateTransform():
     """
     Class for transforming pts between light sheet and CCFv3 space
@@ -285,13 +266,16 @@ class CoordinateTransform():
         
     processing_manifest: dict
         metadata for your dataset loaded from the processing_manifest.json
+        
+    image_metadata: dict
     """
     
     def __init__(
             self, 
-            name: str, 
+            name: str,
             dataset_transforms: list,
-            processing_manifest: dict
+            processing_manifest: dict,
+            image_metadata: dict
     ):
         
         self.ccf_transforms = _get_ccf_transforms(name)
@@ -300,14 +284,11 @@ class CoordinateTransform():
         
         self.dataset_transforms = dataset_transforms
         self.acquisition = _parse_acquisition_data(processing_manifest)
-        
-
+        self.zarr_shape = image_metadata['shape']
+    
     def forward_transform(
         self, 
-        points: np.array,
-        input_image: da.Array,
-        image_res: list,
-        reg_ds: int,
+        points: pd.DataFrame,
         ccf_res = 25,
     ) -> np.array:
         """
@@ -319,9 +300,6 @@ class CoordinateTransform():
             array of points in raw light sheet space
         input_image: da.array
             dask array of the image that the points were annotated on
-        reg_ds : int
-            The level of downsampling that was done during registration. The 
-            default for SmartSPIM is 3
         ccf_res: int
             The resolution of the ccf used in registration
             
@@ -332,11 +310,19 @@ class CoordinateTransform():
 
         """
         
+        # order columns to align with imaging
+        col_order = ['', '', '']
+        for dim in self.acquisition['orientation']:
+            col_order[dim['dimension']] = dim['name'].lower()
+            
+        points = points[col_order]
+        reg_ds = self.acquisition['registration']['input_scale']
+        
         # downsample points to registration resolution
-        points_ds = points / 2**reg_ds
+        points_ds = points.values / 2**reg_ds
         
         # get dimensions of registered image for orienting points
-        input_shape = input_image.shape
+        input_shape = self.zarr_shape
         if len(input_shape) == 5:
             input_shape = input_shape[2:]
             
@@ -344,7 +330,7 @@ class CoordinateTransform():
         reg_dims = [dim / 2**reg_ds for dim in input_shape]
         
         # flip axis based on the template orientation relative to input image
-        orient = utils.get_orientation(self.acquisition)
+        orient = utils.get_orientation(self.acquisition['orientation'])
         
         _, swapped, mat = utils.get_orientation_transform(
             orient, self.ls_template_info["orientation"]
@@ -355,7 +341,7 @@ class CoordinateTransform():
                 points_ds[:, idx] = reg_dims[idx] - points_ds[:, idx]
         
         
-        image_res = [dim['resolution'] for dim in self.acquisition]
+        image_res = [dim['resolution'] for dim in self.acquisition['orientation']]
         
         #scale points and orient axes to template
         scaling = utils.calculate_scaling(
@@ -397,10 +383,7 @@ class CoordinateTransform():
 
     def reverse_transform(
             self, 
-            points: np.array,
-            input_image: da.Array,
-            image_res: list,
-            reg_ds: int,
+            points: pd.DataFrame,
             ccf_res = 25,
     ) -> np.array:
         """
@@ -410,9 +393,8 @@ class CoordinateTransform():
         ----------
         points : np.array
             array of points in CCFv3 space
-        reg_ds : int
-            The level of downsampling that was done during registration. The 
-            default for SmartSPIM is 3
+        ccf_res: int
+            The resolution of the ccf used in registration
 
         Returns
         -------
@@ -420,10 +402,17 @@ class CoordinateTransform():
             array of points in light sheet space
         """
         
-        #TODO make this so it is not hard coded
-        # orient points from CCF visual to CCF ants orientation
-        ccf_pts = points[:, [0, 2, 1]]
+        #TODO figure this out
+        #make sure points are ordered correctly
+        points = points[['z']]
+        reg_ds = self.acquisition['registration']['input_scale']
         
+        # orient points for transformation
+        _, swapped, _ = utils.get_orientation_transform(
+            self.ccf_template_info["orientation"], self.ls_template_info["orientation"]
+        )
+        
+        ccf_pts = points[:, swapped]
         
         # convert points into raw space
         ants_pts = utils.convert_to_ants_space(self.ccf_info, ccf_pts)
@@ -443,26 +432,18 @@ class CoordinateTransform():
         raw_pts = utils.convert_from_ants_space(self.template_info, raw_pts)
         
         
-        # get dimensions of registered image for orienting points
-        input_shape = input_image.shape
-        if len(input_shape) == 5:
-            input_shape = input_shape[2:]
-            
-        reg_dims = [dim / 2**reg_ds for dim in input_shape]
-        
-        # flip axis based on the template orientation relative to input image
-        orient = utils.get_orientation(self.orientation)
-        
+        # orient axes to original image
+        orient = utils.get_orientation(self.acquisition)
+                
         _, swapped, mat = utils.get_orientation_transform(
-            self.template_info["orientation"], orient
+            self.ls_template_info["orientation"], orient
         )
         
-        for idx, dim_orient in enumerate(mat.sum(axis=1)):
-            if dim_orient < 0:
-                raw_pts[:, idx] = reg_dims[idx] - raw_pts[:, idx]
+        orient_pts = raw_pts[:, swapped]
         
+        #scale points
+        image_res = [dim['resolution'] for dim in self.acquisition['orientation']]
         
-        #scale points and orient axes to original image
         scaling = utils.calculate_scaling(
             image_res = image_res,
             downsample = 2**reg_ds,
@@ -470,10 +451,20 @@ class CoordinateTransform():
             direction = 'reverse'
         )
         
-        scaled_pts = utils.scale_points(raw_pts, scaling)
-        orient_pts = scaled_pts[:, swapped]
-        
+        scaled_pts = utils.scale_points(orient_pts, scaling)
+                
+        # get dimensions of registered image for orienting points
+        input_shape = self.zarr_shape
+        if len(input_shape) == 5:
+            input_shape = input_shape[2:]
+                    
+        reg_dims = [dim / 2**reg_ds for dim in input_shape]
+                
+        for idx, dim_orient in enumerate(mat.sum(axis=1)):
+            if dim_orient < 0:
+                scaled_pts[:, idx] = reg_dims[idx] - scaled_pts[:, idx]
+            
         # upsample points from registration to raw image space
-        transformed_pts = orient_pts / 2**reg_ds
+        transformed_pts = scaled_pts * 2**reg_ds
     
         return transformed_pts

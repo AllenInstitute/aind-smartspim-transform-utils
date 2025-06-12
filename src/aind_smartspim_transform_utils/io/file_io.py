@@ -7,12 +7,14 @@ Created on Fri May 30 13:59:08 2025
 """
 
 import os
+import boto3
 import json
 import ants
 
 import numpy as np
 
 from glob import glob
+from tqdm import tqdm
 
 
 def _check_transforms(transforms_list: list):
@@ -31,44 +33,7 @@ def _check_transforms(transforms_list: list):
 
     """
     
-def get_transforms(transforms_path: str):
-    """
-    Get the paths to the transforms for the provided dataset as well as the
-    required acquisition information for transforming points
-
-    Parameters
-    ----------
-    transform_path : str
-        path to the transforms created during registration
-
-    Returns
-    -------
-    transforms : list
-        list of all transform files from registration
-
-    """
-    
-    transforms = {}
-    
-    try:
-        transforms['points_to_ccf'] = [
-                glob(os.path.join(transforms_path, '*SyN_0GenericAffine.mat'))[0],
-                glob(os.path.join(transforms_path, '*InverseWarp.nii.gz'))[0],
-        ]
-    except:
-        FileNotFoundError("Could not find files needed for moving points from light sheet to CCF")
-        
-    try:
-        transforms['points_from_ccf'] = [
-            glob(os.path.join(transforms_path, '*SyN_1Warp.nii.gz'))[0],
-            glob(os.path.join(transforms_path, '*SyN_0GenericAffine.mat'))[0],
-        ]
-    except:
-        FileNotFoundError("Could not find files needed for moving points from CCF to light sheet")
-        
-    return transforms
-
-def read_json_as_dict(filepath: str) -> dict:
+def _read_json_as_dict(filepath: str) -> dict:
     """
     Loads json file
 
@@ -85,7 +50,7 @@ def read_json_as_dict(filepath: str) -> dict:
     """
     
     if not os.path.exists(filepath):
-        FileNotFoundError(f"File {filepath} does not exist.")
+        raise FileNotFoundError(f"File {filepath} does not exist.")
     
     
     with open(filepath, 'r') as fp:
@@ -93,31 +58,243 @@ def read_json_as_dict(filepath: str) -> dict:
     
     return data
 
-def load_imaging_metadata(manifest_path: str) -> dict:
+
+def _load_data_from_s3(dataset_paths: list, bucket: str) -> dict:
+    
+    client = boto3.client('s3')
+    
+    for path in dataset_paths:
+        path = path.split(bucket)[-1][1:]
+        try:
+            res = client.get_object(
+                Bucket=bucket, 
+                Key=path
+            )
+            data = json.loads(res['Body'].read())
+        except:
+            pass
+        
+    if data not in locals():
+        file = os.path.basename(dataset_paths[0])
+        raise FileNotFoundError(f"Could not locate {file}. Please check provided path")
+            
+    return data
+    
+def _load_data_from_local(dataset_paths: list) -> dict:
+    
+    for path in dataset_paths:
+        try:
+            data = _read_json_as_dict(path)
+        except:
+            pass
+        
+    if data not in locals():
+        file = os.path.basename(dataset_paths[0])
+        raise FileNotFoundError(f"Could not locate {file}. Please check provided path")
+    
+    return data
+
+def _download_data_from_s3(data_folder: str, files: list, dest: str):
     """
-    Loads the acquisition metadata from processing manifest that is needed for 
-    properly registering the data
+    Downloads data files from s3 bucket and saves them to the provided
+    path. If you are working in a Code Ocean Capsule it is recommended
+    that you set your destination to '/scratch/'.
 
     Parameters
     ----------
-    manifest_path : str
-        path to the processing manifest
+    data_folder : str
+        folder on s3 where the data files you wish to download are located
+    files : list
+        list of files to download from the specified folder
+    dest : str
+        the local directory where the data will be stored
 
     Returns
     -------
-    imaging_data: dict
+    None.
+
+    """
+    
+    client = boto3.client('s3')
+
+    for file in files:
+        fname = os.path.join(dest, file)
+        s3_object_key = f'{data_folder}/{file}'
+            
+        meta_data = client.head_object(Bucket='aind-open-data', Key=s3_object_key)
+        total_len = int(meta_data.get('ContentLength', 0))
+        bar = "{percentage:.1f}%|{bar:25} | {rate_fmt} | {desc}"
+            
+        with tqdm(
+                total = total_len, 
+                desc = s3_object_key, 
+                bar_format=bar, 
+                unit='B', 
+                unit_scale = True
+            ) as pbar:
+                
+            with open(fname, 'wb') as f:
+                client.download_fileobj(
+                    'aind-open-data', 
+                    s3_object_key, 
+                    f, 
+                    Callback=pbar.update
+                )
+    
+def get_transforms(
+        dataset_path: str, 
+        manifest: dict,
+        dest = None
+) -> list:
+    """
+    Get the paths to the transforms for the provided dataset as well as the
+    required acquisition information for transforming points
+
+    Parameters
+    ----------
+    dataset_path : str
+        path to the transforms created during registration
+        
+    manifest : dict
+        information loaded from the processing_manifest.json
+        
+    dest : str Optional
+        destination for saving transforms if loaded from s3
+
+    Returns
+    -------
+    transforms : list
+        list of all transform files from registration
+
+    """
+    
+    channel = manifest['pipeline_processing']['registration']['channels'][0]
+
+    
+    transforms = {}
+    
+    if "s3://" in dataset_path:
+        
+        if not os.path.exists(dest):
+            raise FileExistsError(f"Provided directory {dest} does not exist")
+        
+        data_folder = os.path.join(
+            dataset_path.split('/')[-1],
+            'image_atlas_alignment',
+            channel
+        )
+        
+        files = [
+            'ls_to_template_SyN_0GenericAffine.mat',
+            'ls_to_template_SyN_1InverseWarp.nii.gz',
+            'ls_to_template_SyN_1Warp.nii.gz'
+        ]
+        
+        _download_data_from_s3(data_folder, files, dest)
+        
+        transforms_path = dest
+        
+    else:
+        
+        transforms_path = os.path.join(
+            dataset_path,
+            'image_atlas_alignment',
+            channel
+        )
+    
+    try:
+        transforms['points_to_ccf'] = [
+            glob(os.path.join(transforms_path, '*SyN_0GenericAffine.mat'))[0],
+            glob(os.path.join(transforms_path, '*InverseWarp.nii.gz'))[0],
+        ]
+    except:
+        raise FileNotFoundError("Could not find files needed for moving points from light sheet to CCF")
+        
+    try:
+        transforms['points_from_ccf'] = [
+            glob(os.path.join(transforms_path, '*SyN_1Warp.nii.gz'))[0],
+            glob(os.path.join(transforms_path, '*SyN_0GenericAffine.mat'))[0],
+        ]
+    except:
+        raise FileNotFoundError("Could not find files needed for moving points from CCF to light sheet")
+        
+    return transforms
+
+
+def get_processing_manifest(dataset_path: str, bucket = None) -> dict:
+    """
+    Loads the acquisition metadata from processing manifest that is needed for 
+    properly registering the data. Dataset location can be local or on s3.
+    
+    local example: /data/SmartSPIM_696515_2024-04-17_17-18-37_stitched_2025-05-14_05-41-57
+    s3 example: s3://aind-open-data/SmartSPIM_696515_2024-04-17_17-18-37_stitched_2025-05-14_05-41-57
+
+    Parameters
+    ----------
+    dataset_path : str
+        the root directory of the stitched dataset that you want to process
+    bucket : str Optional
+        the bucket that contains stitched dataset that you want to process. 
+        Only needed if you are loading from s3
+
+    Returns
+    -------
+    dict
         information on how the data was acquired 
 
     """
     
-    manifest_file = os.path.join(manifest_path, 'processing_manifest.json')
-    
-    if not os.path.isfile(manifest_file):
-        FileNotFoundError(f"processing manifest cannot be found at: {manifest_file}")
+    try:
+        raw_path = dataset_path.split("_stitched_")[0]
+    except:
+        raise ValueError(f"Please provided stitched folder path. Provided path was {dataset_path}")
         
-    imaging_data = read_json_as_dict(manifest_file)
+    manifest_paths = [
+        f"{raw_path}/derivatives/processing_manifest.json",
+        f"{raw_path}/SPIM/derivatives/processing_manifest.json"
+    ]
     
-    return imaging_data
+    if "s3://" in dataset_path:
+        return _load_data_from_s3(manifest_paths, bucket)
+    else:
+        return _load_data_from_local(manifest_paths)
+    
+def get_image_metadata(dataset_path: str, manifest: dict, bucket = None) -> dict:
+    """
+    Loads metadata on the zarr file. Information on the image shape is required
+    for transforming points
+
+    Parameters
+    ----------
+    dataset_path : str
+        the root directory of the stitched dataset that you want to process
+    manifest : dict
+        metadata for dataset loaded from processing_manifest.json
+    bucket : str Optional
+        the bucket that contains stitched dataset that you want to process. 
+        Only needed if you are loading from s3
+
+    Returns
+    -------
+    dict
+        metadata on the image that was used during registration
+
+    """
+    
+    channel = manifest['pipeline_processing']['registration']['channels'][0]
+    
+    zarr_path = os.path.join(
+        dataset_path,
+        'image_tile_fusing/OMEZarr',
+        f"{channel}.zarr",
+        '0',
+        '.zarray'
+    )
+    
+    if "s3://" in zarr_path:
+        return _load_data_from_s3([zarr_path], bucket)
+    else:
+        return _load_data_from_local([zarr_path])
 
 def load_ants_nifti(filepath: str) -> dict:
     """
@@ -140,7 +317,7 @@ def load_ants_nifti(filepath: str) -> dict:
     """
     
     if not os.path.exists(filepath):
-        FileNotFoundError(f"File {filepath} does not exist.")
+        raise FileNotFoundError(f"File {filepath} does not exist.")
     
     ants_img = ants.image_read(filepath)
 
