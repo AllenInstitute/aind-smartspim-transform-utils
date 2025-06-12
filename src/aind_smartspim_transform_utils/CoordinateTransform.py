@@ -376,9 +376,10 @@ class CoordinateTransform():
         )
         
         transformed_pts = ccf_pts[:, swapped]
+        transformed_df = pd.DataFrame(transformed_pts, columns = ['AP', 'DV', 'ML'])
         
     
-        return transformed_pts
+        return transformed_df
 
     def reverse_transform(
             self, 
@@ -390,8 +391,9 @@ class CoordinateTransform():
 
         Parameters
         ----------
-        points : np.array
-            array of points in CCFv3 space
+        points : pd.DataFrame
+            array of points in CCFv3 space. Input columns for dataframe must
+            have column names defined as 'ML', 'AP', and 'DV'
         ccf_res: int
             The resolution of the ccf used in registration
 
@@ -401,9 +403,9 @@ class CoordinateTransform():
             array of points in light sheet space
         """
         
-        #TODO figure this out
         #make sure points are ordered correctly
-        points = points[['z']]
+        cff_order = ['AP', 'DV', 'ML']
+        points = points[cff_order]
         reg_ds = self.acquisition['registration']['input_scale']
         
         # orient points for transformation
@@ -412,6 +414,7 @@ class CoordinateTransform():
         )
         
         ccf_pts = points[:, swapped]
+        ordered_cols = [cff_order[c] for c in swapped]
         
         # convert points into raw space
         ants_pts = utils.convert_to_ants_space(self.ccf_info, ccf_pts)
@@ -439,6 +442,7 @@ class CoordinateTransform():
         )
         
         orient_pts = raw_pts[:, swapped]
+        ordered_cols = [ordered_cols[c] for c in swapped]
         
         #scale points
         image_res = [dim['resolution'] for dim in self.acquisition['orientation']]
@@ -465,5 +469,7 @@ class CoordinateTransform():
             
         # upsample points from registration to raw image space
         transformed_pts = scaled_pts * 2**reg_ds
+        
+        transformed_df = pd.DataFrame(transformed_pts, columns = ordered_cols)
     
-        return transformed_pts
+        return transformed_df
