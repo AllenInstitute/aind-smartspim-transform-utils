@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 
-from imlib.IO import get_cells
+from imlib.IO.cells import get_cells
 from glob import glob
 from tqdm import tqdm
 
