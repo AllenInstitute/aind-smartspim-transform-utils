@@ -209,7 +209,7 @@ def _parse_acquisition_data(manifest: dict):
         'orientation': orientation,
         'registration': pipeline_processing['registration'],
         'segmentation': pipeline_processing['segmentation'],
-        'channels': [v for k, v in manifest['channel_translation']]
+        'channels': [v for k, v in manifest['channel_translation'].items()]
     }
                 
     return acquisition
