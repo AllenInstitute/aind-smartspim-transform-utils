@@ -74,7 +74,7 @@ def _load_data_from_s3(dataset_paths: list, bucket: str) -> dict:
         except:
             pass
         
-    if data not in locals():
+    if 'data' not in locals():
         file = os.path.basename(dataset_paths[0])
         raise FileNotFoundError(f"Could not locate {file}. Please check provided path")
             
@@ -88,7 +88,7 @@ def _load_data_from_local(dataset_paths: list) -> dict:
         except:
             pass
         
-    if data not in locals():
+    if 'data' not in locals():
         file = os.path.basename(dataset_paths[0])
         raise FileNotFoundError(f"Could not locate {file}. Please check provided path")
     
