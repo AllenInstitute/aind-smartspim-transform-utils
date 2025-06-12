@@ -417,7 +417,7 @@ class CoordinateTransform():
         ordered_cols = [cff_order[c] for c in swapped]
         
         # convert points into raw space
-        ants_pts = utils.convert_to_ants_space(self.ccf_info, ccf_pts)
+        ants_pts = utils.convert_to_ants_space(self.ccf_template_info, ccf_pts)
         
         template_pts = utils.apply_transforms_to_points(
             ants_pts, 
@@ -431,11 +431,11 @@ class CoordinateTransform():
             invert=(False, False)
         )
         
-        raw_pts = utils.convert_from_ants_space(self.template_info, raw_pts)
+        raw_pts = utils.convert_from_ants_space(self.ls_template_info, raw_pts)
         
         
         # orient axes to original image
-        orient = utils.get_orientation(self.acquisition)
+        orient = utils.get_orientation(self.acquisition['orientation'])
                 
         _, swapped, mat = utils.get_orientation_transform(
             self.ls_template_info["orientation"], orient
