@@ -22,7 +22,7 @@ dependencies = [
     'zarr==2.18.0',
     'dask[distributed]==2024.4.1',
     'antspyx==0.4.2',
-    'numpy==1.24.0',
+    'numpy==1.23.5',
     'boto3==1.37.2',
     'imlib==0.1.3'
 ]
