@@ -175,16 +175,16 @@ def _fetch_zarr_data(dataset_path: str, channel:str, level: int) -> list:
     return fio._read_json_as_dict(zarr_path)
 
 
-def _parse_acquisition_data(manifest: dict):
+def _parse_acquisition_data(acquisition_dict: dict):
     """
-    Retrieves the relevant imaging information from the processing manifest
+    Retrieves the relevant imaging information from the acquisition.json
     that is required for transforming points
     
 
     Parameters
     ----------
-    manifest : dict
-        The data from loading the processing manifest
+    acquisition_dict : dict
+        The data from loading the acquisition.json
 
     Returns
     -------
@@ -195,41 +195,46 @@ def _parse_acquisition_data(manifest: dict):
 
     """
     
-    orientation = manifest['prelim_acquisition']['axes']
-    pipeline_processing = manifest['pipeline_processing']
+    orientation = acquisition_dict['axes']
+    
+    scales = {}
+    for scale, axis in  zip(acquisition_dict['tiles'][0]['coordinate_transformations'][1]['scales'], ['X', 'Y', 'Z']):
+        scales[axis] = scale
     
     for c, axis in enumerate(orientation):
-        for res in pipeline_processing['stitching']['resolution']:
-            if res['axis_name'] == axis['name']:
-                axis['resolution'] = res['resolution']
+        for s, res in scales:
+            if s == axis['name']:
+                axis['resolution'] = res
                 orientation[c] = axis
+                
+    channels = []
+    
+    for tile in acquisition_dict['tiles']:
+        channel = tile['file_name'].split('/')[0]
+        if channel not in channels:
+            channels.append(channel)
                 
     acquisition = {
         'orientation': orientation,
-        'registration': pipeline_processing['registration'],
-        'segmentation': pipeline_processing['segmentation'],
-        'channels': [v for k, v in manifest['channel_translation'].items()]
+        'channels': channels
     }
                 
     return acquisition
 
 
-def get_dataset_transforms(manifest_path: str) -> dict:
+def get_dataset_transforms(dataset_path: str) -> dict:
     """
     Loads the dynamic transforms for a given dataset. dataset path can either
     be a local location or the S3 bucket location for a given dataset
 
     Parameters
     ----------
-    manifest_path : str
+    dataset_path : str
         location of the transforms and acquisition.json for a given dataset
         if there is no acquisition.json will only register to template
 
     Returns
     -------
-    acquisition: dict
-        The acquisition parameters for registering from template to raw space
-        if it is not provided will be None
         
     transforms: dict
         the transforms needed for moving pts forward or backward
@@ -238,14 +243,14 @@ def get_dataset_transforms(manifest_path: str) -> dict:
     
     transforms = {}
     
-    if not os.path.exists(manifest_path):
-        raise FileExistsError(f"{manifest_path} does not exist.")
+    if not os.path.exists(dataset_path):
+        raise FileExistsError(f"{dataset_path} does not exist.")
         
         
-    manifest, transforms = fio.get_transforms(manifest_path)
+    transforms = fio.get_transforms(dataset_path)
         
     
-    return manifest, transforms
+    return transforms
 
 class CoordinateTransform():
     """
@@ -263,8 +268,8 @@ class CoordinateTransform():
     dataset_transforms: list
         A list of the dataset specific transforms you want to use
         
-    processing_manifest: dict
-        metadata for your dataset loaded from the processing_manifest.json
+    acquisition: dict
+        metadata for your dataset loaded from the acquisition.json
         
     image_metadata: dict
     """
@@ -273,7 +278,7 @@ class CoordinateTransform():
             self, 
             name: str,
             dataset_transforms: list,
-            processing_manifest: dict,
+            acquisition: dict,
             image_metadata: dict
     ):
         
@@ -282,7 +287,7 @@ class CoordinateTransform():
         self.ls_template, self.ls_template_info = _get_ls_template(name)
         
         self.dataset_transforms = dataset_transforms
-        self.acquisition = _parse_acquisition_data(processing_manifest)
+        self.acquisition = _parse_acquisition_data(acquisition)
         self.zarr_shape = image_metadata['shape']
     
     def forward_transform(

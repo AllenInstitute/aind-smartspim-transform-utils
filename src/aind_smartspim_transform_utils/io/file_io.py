@@ -166,7 +166,7 @@ def _read_xml_as_df(fpath: str) -> pd.DataFrame:
     
 def get_transforms(
         dataset_path: str, 
-        manifest: dict,
+        channel: str,
         dest = None
 ) -> list:
     """
@@ -178,8 +178,8 @@ def get_transforms(
     dataset_path : str
         path to the transforms created during registration
         
-    manifest : dict
-        information loaded from the processing_manifest.json
+    channel : str
+        channel that was registered
         
     dest : str Optional
         destination for saving transforms if loaded from s3
@@ -190,8 +190,6 @@ def get_transforms(
         list of all transform files from registration
 
     """
-    
-    channel = manifest['pipeline_processing']['registration']['channels'][0]
 
     
     transforms = {}
@@ -244,7 +242,7 @@ def get_transforms(
     return transforms
 
 
-def get_processing_manifest(dataset_path: str, bucket = None) -> dict:
+def get_acquisition(dataset_path: str, bucket = None) -> dict:
     """
     Loads the acquisition metadata from processing manifest that is needed for 
     properly registering the data. Dataset location can be local or on s3.
@@ -268,21 +266,20 @@ def get_processing_manifest(dataset_path: str, bucket = None) -> dict:
     """
     
     try:
-        raw_path = dataset_path.split("_stitched_")[0]
+        raw_path = str(dataset_path)
     except:
         raise ValueError(f"Please provided stitched folder path. Provided path was {dataset_path}")
         
-    manifest_paths = [
-        f"{raw_path}/derivatives/processing_manifest.json",
-        f"{raw_path}/SPIM/derivatives/processing_manifest.json"
+    acquisition_paths = [
+        f"{raw_path}/acquisition.json",
     ]
     
     if "s3://" in dataset_path:
-        return _load_data_from_s3(manifest_paths, bucket)
+        return _load_data_from_s3(acquisition_paths, bucket)
     else:
-        return _load_data_from_local(manifest_paths)
+        return _load_data_from_local(acquisition_paths)
     
-def get_image_metadata(dataset_path: str, manifest: dict, bucket = None) -> dict:
+def get_image_metadata(dataset_path: str, channel: str, bucket = None) -> dict:
     """
     Loads metadata on the zarr file. Information on the image shape is required
     for transforming points
@@ -291,8 +288,8 @@ def get_image_metadata(dataset_path: str, manifest: dict, bucket = None) -> dict
     ----------
     dataset_path : str
         the root directory of the stitched dataset that you want to process
-    manifest : dict
-        metadata for dataset loaded from processing_manifest.json
+    channel : dict
+        channel that was used for registration
     bucket : str Optional
         the bucket that contains stitched dataset that you want to process. 
         Only needed if you are loading from s3
@@ -304,10 +301,8 @@ def get_image_metadata(dataset_path: str, manifest: dict, bucket = None) -> dict
 
     """
     
-    channel = manifest['pipeline_processing']['registration']['channels'][0]
-    
     zarr_path = os.path.join(
-        dataset_path,
+        str(dataset_path),
         'image_tile_fusing/OMEZarr',
         f"{channel}.zarr",
         '0',
