@@ -193,6 +193,7 @@ def get_transforms(
 
     
     transforms = {}
+    dataset_path = str(dataset_path)
     
     if "s3://" in dataset_path:
         
