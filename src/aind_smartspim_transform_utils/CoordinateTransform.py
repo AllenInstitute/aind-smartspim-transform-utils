@@ -198,7 +198,7 @@ def _parse_acquisition_data(acquisition_dict: dict):
     orientation = acquisition_dict['axes']
     
     scales = {}
-    for scale, axis in  zip(acquisition_dict['tiles'][0]['coordinate_transformations'][1]['scales'], ['X', 'Y', 'Z']):
+    for scale, axis in  zip(acquisition_dict['tiles'][0]['coordinate_transformations'][1]['scale'], ['X', 'Y', 'Z']):
         scales[axis] = scale
     
     for c, axis in enumerate(orientation):
