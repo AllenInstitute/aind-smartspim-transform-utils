@@ -266,8 +266,10 @@ def get_acquisition(dataset_path: str, bucket = None) -> dict:
 
     """
     
+    dataset_path = str(dataset_path)
+    
     try:
-        raw_path = str(dataset_path)
+        raw_path = dataset_path
     except:
         raise ValueError(f"Please provided stitched folder path. Provided path was {dataset_path}")
         
