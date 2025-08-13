@@ -202,7 +202,7 @@ def _parse_acquisition_data(acquisition_dict: dict):
         scales[axis] = scale
     
     for c, axis in enumerate(orientation):
-        for s, res in scales:
+        for s, res in scales.items():
             if s == axis['name']:
                 axis['resolution'] = res
                 orientation[c] = axis
