@@ -8,7 +8,6 @@ Created on Thu May 29 09:59:09 2025
 
 
 import ants
-
 import numpy as np
 import pandas as pd
 
@@ -42,7 +41,10 @@ def get_orientation(params: dict) -> str:
 
     return "".join(orient)
 
-def get_orientation_transform(orientation_in: str, orientation_out: str) -> tuple:
+
+def get_orientation_transform(
+    orientation_in: str, orientation_out: str
+) -> tuple:
     """
     Takes orientation acronyms (i.e. spr) and creates a convertion matrix for
     converting from one to another
@@ -82,14 +84,12 @@ def get_orientation_transform(orientation_in: str, orientation_out: str) -> tupl
 
     return original, swapped, transform_matrix
 
+
 def calculate_scaling(
-        image_res: list, 
-        downsample: int, 
-        ccf_res: int, 
-        direction: str
+    image_res: list, downsample: int, ccf_res: int, direction: str
 ) -> list:
     """
-    
+
 
     Parameters
     ----------
@@ -108,16 +108,16 @@ def calculate_scaling(
         DESCRIPTION.
 
     """
-    
+
     ds_res = [res * downsample for res in image_res]
-    
-    if direction =='forward':
+
+    if direction == "forward":
         values = zip(ds_res, [ccf_res] * 3)
-    elif direction == 'reverse':
+    elif direction == "reverse":
         values = zip([ccf_res] * 3, ds_res)
-        
-    return [res_1/res_2 for res_1, res_2 in values]
-    
+
+    return [res_1 / res_2 for res_1, res_2 in values]
+
 
 def scale_points(points: list, scale: list) -> np.ndarray:
     """
@@ -130,7 +130,7 @@ def scale_points(points: list, scale: list) -> np.ndarray:
         list of coordinates tin a given resolution
 
     scale : list
-        the scaling metric between the resolution of the annotation points 
+        the scaling metric between the resolution of the annotation points
         and the resolution the points are being moved
 
     Returns
@@ -147,6 +147,7 @@ def scale_points(points: list, scale: list) -> np.ndarray:
         )
 
     return np.array(scaled_points)
+
 
 def convert_to_ants_space(ants_parameters: dict, index_pts: np.ndarray):
     """
@@ -178,6 +179,7 @@ def convert_to_ants_space(ants_parameters: dict, index_pts: np.ndarray):
 
     return ants_pts
 
+
 def convert_from_ants_space(ants_parameters: dict, physical_pts: np.ndarray):
     """
     Convert points from the physical space of an ANTsImage and places
@@ -206,6 +208,7 @@ def convert_from_ants_space(ants_parameters: dict, physical_pts: np.ndarray):
         pts[:, dim] /= ants_parameters["scale"][dim]
 
     return pts
+
 
 def apply_transforms_to_points(
     ants_pts: np.ndarray, transforms: list, invert: tuple

@@ -12,9 +12,9 @@ base_dir.mkdir(parents=True, exist_ok=True)
 
 # this code would install in scratch if on CO but dont know if it is good for local
 
-#if os.path.exists(Path.home() / "capsule"):
+# if os.path.exists(Path.home() / "capsule"):
 #    base_dir = Path.home() / 'capsule' / 'scratch' / "transform_utils"
-#else:
+# else:
 #    base_dir = Path.home() / ".transform_utils" / "transform_utils"
 
-#base_dir.mkdir(parents=True, exist_ok=True)
+# base_dir.mkdir(parents=True, exist_ok=True)
