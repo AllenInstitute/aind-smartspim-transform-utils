@@ -174,6 +174,38 @@ def _fetch_zarr_data(dataset_path: str, channel:str, level: int) -> list:
     
     return fio._read_json_as_dict(zarr_path)
 
+def _get_estimated_downsample(
+    voxel_resolution: list,
+    registration_res: tuple = (16.0, 14.4, 14.4),
+) -> int:
+    """
+    Get the estimated multiscale based on the provided
+    voxel resolution. This is used for image stitching.
+
+    e.g., if the original resolution is (1.8. 1.8, 2.0)
+    in XYZ order, and you provide (3.6, 3.6, 4.0) as
+    image resolution, then the picked resolution will be
+    1.
+
+    Parameters
+    ----------
+    voxel_resolution: List[float]
+        Image original resolution. This would be the resolution
+        in the multiscale "0".
+    registration_res: Tuple[float]
+        Approximated resolution that was used for registration
+        in the computation of the transforms. Default: (16.0, 14.4, 14.4)
+    """
+
+    downsample_versions = []
+    for idx in range(len(voxel_resolution)):
+        downsample_versions.append(
+            registration_res[idx] // float(voxel_resolution[idx])
+        )
+
+    downsample_res = int(min(downsample_versions))
+    return round(np.log2(downsample_res))
+
 
 def _parse_acquisition_data(acquisition_dict: dict):
     """
@@ -216,6 +248,9 @@ def _parse_acquisition_data(acquisition_dict: dict):
                 
     acquisition = {
         'orientation': orientation,
+        'registration': _get_estimated_downsample(
+            list(scales[['Z', 'Y', 'X']])
+        ),
         'channels': channels
     }
                 
@@ -320,7 +355,7 @@ class CoordinateTransform():
             col_order[dim['dimension']] = dim['name'].lower()
             
         points = points[col_order]
-        reg_ds = self.acquisition['registration']['input_scale']
+        reg_ds = self.acquisition['registration']
         
         # downsample points to registration resolution
         points_ds = points.values / 2**reg_ds
@@ -411,7 +446,7 @@ class CoordinateTransform():
         #make sure points are ordered correctly
         cff_order = ['AP', 'DV', 'ML']
         points = points[cff_order].values
-        reg_ds = self.acquisition['registration']['input_scale']
+        reg_ds = self.acquisition['registration']
         
         # orient points for transformation
         _, swapped, _ = utils.get_orientation_transform(
