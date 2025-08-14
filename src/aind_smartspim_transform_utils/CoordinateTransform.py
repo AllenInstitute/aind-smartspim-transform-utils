@@ -249,7 +249,7 @@ def _parse_acquisition_data(acquisition_dict: dict):
     acquisition = {
         'orientation': orientation,
         'registration': _get_estimated_downsample(
-            list(scales[['Z', 'Y', 'X']])
+            [s[1] for s in sorted(scales.items(), reverse = True)]
         ),
         'channels': channels
     }
