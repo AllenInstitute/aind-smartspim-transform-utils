@@ -374,7 +374,7 @@ class ImageTransform:
         img_out, in_mat, out_mat = utils.check_orientation(
             img_array,
             self.acquisition["orientation"],
-            self.template_orientation["template_orientations"],
+            self.template_orientation,
         )
         
         spacing_order = np.where(in_mat)[1]
@@ -459,7 +459,7 @@ class ImageTransform:
         img_out, in_mat, out_mat = utils.check_orientation(
             dataset_array,
             self.acquisition["orientation"],
-            self.template_orientation["template_orientations"],
+            self.template_orientation,
         )
         
         spacing_order = np.where(in_mat)[1]
