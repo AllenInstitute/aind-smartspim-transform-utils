@@ -386,8 +386,8 @@ class ImageTransform:
             print(f"Downsample factor of {reg_ds} provided for registration")
             
         spacing = [0 ,0, 0]
-        for o in enumerate(self.acquisition['orientation']):
-            spacing[o['dimension']] = o['resolution'] * reg_ds
+        for o in self.acquisition['orientation']:
+            spacing[o['dimension']] = o['resolution'] * 2**reg_ds
         
         img_spacing = tuple([spacing[s] for s in spacing_order])
         
@@ -465,8 +465,8 @@ class ImageTransform:
         spacing_order = np.where(in_mat)[1]
         
         spacing = [0 ,0, 0]
-        for o in enumerate(self.acquisition['orientation']):
-            spacing[o['dimension']] = o['resolution'] * reg_ds
+        for o in self.acquisition['orientation']:
+            spacing[o['dimension']] = o['resolution'] * 2**reg_ds
         
         img_spacing = tuple([spacing[s] for s in spacing_order])
         
