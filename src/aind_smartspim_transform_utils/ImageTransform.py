@@ -371,7 +371,7 @@ class ImageTransform:
             self.template_orientation,
         )
         
-        print(f"Image has been oriented to template: {img_out.shape)")
+        print(f"Image has been oriented to template: {img_out.shape}")
         
         spacing_order = np.where(in_mat)[1]
         
@@ -392,7 +392,7 @@ class ImageTransform:
         ants_img.set_origin(self.ls_template.origin)
             
         print('################################')
-        print(f"Ants Image: {ants_image)")
+        print(f"Ants Image: {ants_img}")
         print(f"Light Sheet Template: {self.ls_template}")
         print(f"CCF Template: {self.ccf_template}")
         print('################################')
