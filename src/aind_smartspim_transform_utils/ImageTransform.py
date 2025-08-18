@@ -272,14 +272,14 @@ def _parse_acquisition_data(acquisition_dict: dict):
     return acquisition
 
 
-def get_dataset_transforms(dataset_path: str) -> dict:
+def rename_transforms(transforms: dict) -> dict:
     """
-    Loads the dynamic transforms for a given dataset. dataset path can either
-    be a local location or the S3 bucket location for a given dataset
+    renames transforms to make sense with images. Kind of silly we do this but
+    overall I think helpful for people
 
     Parameters
     ----------
-    dataset_path : str
+    transforms : str
         location of the transforms and acquisition.json for a given dataset
         if there is no acquisition.json will only register to template
 
@@ -287,16 +287,10 @@ def get_dataset_transforms(dataset_path: str) -> dict:
     -------
 
     transforms: dict
-        the transforms needed for moving pts forward or backward
+        same transforms just renamed 
 
     """
 
-    transforms = {}
-
-    if not os.path.exists(dataset_path):
-        raise FileExistsError(f"{dataset_path} does not exist.")
-
-    transforms = fio.get_transforms(dataset_path)
     rename_map = {"points_to_ccf": "ccf_from_image", "points_from_ccf": "image_to_ccf"} 
     transforms = {rename_map.get(k, k): v for k, v in transforms.items()}
 
@@ -336,7 +330,7 @@ class ImageTransform:
         self.ccf_template, self.ccf_template_info = _get_ccf_template(name)
         self.ls_template, self.ls_template_info = _get_ls_template(name)
 
-        self.dataset_transforms = dataset_transforms
+        self.dataset_transforms = rename_transforms(dataset_transforms)
         self.acquisition = _parse_acquisition_data(acquisition)
         self.zarr_shape = image_metadata["shape"]
         self.template_orientation = {
@@ -377,6 +371,8 @@ class ImageTransform:
             self.template_orientation,
         )
         
+        print(f"Image has been oriented to template: {img_out.shape)")
+        
         spacing_order = np.where(in_mat)[1]
         
         if reg_ds is None:
@@ -394,6 +390,12 @@ class ImageTransform:
         ants_img = ants.from_numpy(img_out, spacing=img_spacing)
         ants_img.set_direction(self.ls_template.direction)
         ants_img.set_origin(self.ls_template.origin)
+            
+        print('################################')
+        print(f"Ants Image: {ants_image)")
+        print(f"Light Sheet Template: {self.ls_template}")
+        print(f"CCF Template: {self.ccf_template}")
+        print('################################')
 
         # apply transform to template
         aligned_image = ants.apply_transforms(
