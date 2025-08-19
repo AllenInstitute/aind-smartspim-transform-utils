@@ -383,7 +383,7 @@ class ImageTransform:
             
         spacing = [0 ,0, 0]
         for o in self.acquisition['orientation']:
-            spacing[o['dimension']] = o['resolution'] * 2**reg_ds
+            spacing[o['dimension']] = float(o['resolution']) * 2**reg_ds
         
         img_spacing = tuple([spacing[s] for s in spacing_order])
         
@@ -468,7 +468,7 @@ class ImageTransform:
         
         spacing = [0 ,0, 0]
         for o in self.acquisition['orientation']:
-            spacing[o['dimension']] = o['resolution'] * 2**reg_ds
+            spacing[o['dimension']] = float(o['resolution']) * 2**reg_ds
         
         img_spacing = tuple([spacing[s] for s in spacing_order])
         
