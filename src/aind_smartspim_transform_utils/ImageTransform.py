@@ -392,7 +392,7 @@ class ImageTransform:
             print(f"Downsample factor of {reg_ds} provided for registration")
             
         spacing = [0 ,0, 0]
-        unit_conversion = unit_scale_lut(self.acquisition['axes'][0]['unit'])
+        unit_conversion = unit_scale_lut(self.acquisition['orientation'][0]['unit'])
         
         for o in self.acquisition['orientation']:
             spacing[o['dimension']] = float(o['resolution']) * 2**reg_ds * unit_conversion
@@ -479,7 +479,7 @@ class ImageTransform:
         spacing_order = np.where(in_mat)[1]
         
         spacing = [0 ,0, 0]
-        unit_conversion = unit_scale_lut(self.acquisition['axes'][0]['unit'])
+        unit_conversion = unit_scale_lut(self.acquisition['orientation'][0]['unit'])
         
         for o in self.acquisition['orientation']:
             spacing[o['dimension']] = (float(o['resolution']) * 2**reg_ds) * unit_conversion
