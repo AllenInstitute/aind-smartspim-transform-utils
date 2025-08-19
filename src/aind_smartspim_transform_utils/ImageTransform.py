@@ -296,6 +296,16 @@ def rename_transforms(transforms: dict) -> dict:
 
     return transforms
 
+def unit_scale_lut(unit):
+    
+    conversion = {
+        'meter': 1e3,
+        'millimeter': 1,
+        'mircometer': 1e-3,
+    }
+    
+    return conversion[unit]
+
 
 class ImageTransform:
     """
@@ -343,7 +353,7 @@ class ImageTransform:
         self,
         image: np.array,
         ccf_res=25,
-        reg_ds = None
+        reg_ds = None,
     ) -> np.array:
         """
         Moves a 3D image from raw image space into CCF space
@@ -382,8 +392,10 @@ class ImageTransform:
             print(f"Downsample factor of {reg_ds} provided for registration")
             
         spacing = [0 ,0, 0]
+        unit_conversion = unit_scale_lut(self.acquisition['axes'][0]['unit'])
+        
         for o in self.acquisition['orientation']:
-            spacing[o['dimension']] = float(o['resolution']) * 2**reg_ds
+            spacing[o['dimension']] = float(o['resolution']) * 2**reg_ds * unit_conversion
         
         img_spacing = tuple([spacing[s] for s in spacing_order])
         
@@ -467,8 +479,10 @@ class ImageTransform:
         spacing_order = np.where(in_mat)[1]
         
         spacing = [0 ,0, 0]
+        unit_conversion = unit_scale_lut(self.acquisition['axes'][0]['unit'])
+        
         for o in self.acquisition['orientation']:
-            spacing[o['dimension']] = float(o['resolution']) * 2**reg_ds
+            spacing[o['dimension']] = (float(o['resolution']) * 2**reg_ds) * unit_conversion
         
         img_spacing = tuple([spacing[s] for s in spacing_order])
         
