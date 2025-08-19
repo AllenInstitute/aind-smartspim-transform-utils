@@ -301,7 +301,7 @@ def unit_scale_lut(unit):
     conversion = {
         'meter': 1e3,
         'millimeter': 1,
-        'mircometer': 1e-3,
+        'micrometer': 1e-3,
     }
     
     return conversion[unit]
