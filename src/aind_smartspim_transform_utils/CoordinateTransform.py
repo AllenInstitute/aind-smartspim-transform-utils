@@ -383,7 +383,7 @@ class CoordinateTransform:
                 points_ds[:, idx] = reg_dims[idx] - points_ds[:, idx]
 
         image_res = [
-            dim["resolution"] for dim in self.acquisition["orientation"]
+            float(dim["resolution"]) for dim in self.acquisition["orientation"]
         ]
 
         # scale points and orient axes to template
@@ -495,7 +495,7 @@ class CoordinateTransform:
 
         # scale points
         image_res = [
-            dim["resolution"] for dim in self.acquisition["orientation"]
+            float(dim["resolution"]) for dim in self.acquisition["orientation"]
         ]
 
         scaling = utils.calculate_scaling(
