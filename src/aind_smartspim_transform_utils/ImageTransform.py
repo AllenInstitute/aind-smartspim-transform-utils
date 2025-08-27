@@ -72,12 +72,12 @@ def _get_ccf_transforms(name: str) -> dict:
 
         root = os.path.join(base_dir, name, "transforms")
 
-        transforms["ccf_from_image"] = [
+        transforms["ccf_to_ls"] = [
             glob(os.path.join(root, "*.mat"))[0],
             glob(os.path.join(root, "*1InverseWarp_25.nii.gz"))[0],
         ]
 
-        transforms["image_to_ccf"] = [
+        transforms["ls_to_ccf"] = [
             glob(os.path.join(root, "*1Warp_25.nii.gz"))[0],
             glob(os.path.join(root, "*.mat"))[0],
         ]
