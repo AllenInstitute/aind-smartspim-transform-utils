@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Mon Aug 18 14:24:18 2025
+
+@author: nicholas.lusk
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Wed May 28 16:21:46 2025
 
 @author: nicholas.lusk
 """
 
 import os
+import ants
 from glob import glob
 
 import numpy as np
@@ -63,12 +72,12 @@ def _get_ccf_transforms(name: str) -> dict:
 
         root = os.path.join(base_dir, name, "transforms")
 
-        transforms["points_to_ccf"] = [
+        transforms["ccf_from_image"] = [
             glob(os.path.join(root, "*.mat"))[0],
             glob(os.path.join(root, "*1InverseWarp_25.nii.gz"))[0],
         ]
 
-        transforms["points_from_ccf"] = [
+        transforms["image_to_ccf"] = [
             glob(os.path.join(root, "*1Warp_25.nii.gz"))[0],
             glob(os.path.join(root, "*.mat"))[0],
         ]
@@ -263,14 +272,14 @@ def _parse_acquisition_data(acquisition_dict: dict):
     return acquisition
 
 
-def get_dataset_transforms(dataset_path: str) -> dict:
+def rename_transforms(transforms: dict) -> dict:
     """
-    Loads the dynamic transforms for a given dataset. dataset path can either
-    be a local location or the S3 bucket location for a given dataset
+    renames transforms to make sense with images. Kind of silly we do this but
+    overall I think helpful for people
 
     Parameters
     ----------
-    dataset_path : str
+    transforms : str
         location of the transforms and acquisition.json for a given dataset
         if there is no acquisition.json will only register to template
 
@@ -278,21 +287,27 @@ def get_dataset_transforms(dataset_path: str) -> dict:
     -------
 
     transforms: dict
-        the transforms needed for moving pts forward or backward
+        same transforms just renamed 
 
     """
 
-    transforms = {}
-
-    if not os.path.exists(dataset_path):
-        raise FileExistsError(f"{dataset_path} does not exist.")
-
-    transforms = fio.get_transforms(dataset_path)
+    rename_map = {"points_to_ccf": "ccf_from_image", "points_from_ccf": "image_to_ccf"} 
+    transforms = {rename_map.get(k, k): v for k, v in transforms.items()}
 
     return transforms
 
+def unit_scale_lut(unit):
+    
+    conversion = {
+        'meter': 1e3,
+        'millimeter': 1,
+        'micrometer': 1e-3,
+    }
+    
+    return conversion[unit]
 
-class CoordinateTransform:
+
+class ImageTransform:
     """
     Class for transforming pts between light sheet and CCFv3 space
 
@@ -325,115 +340,96 @@ class CoordinateTransform:
         self.ccf_template, self.ccf_template_info = _get_ccf_template(name)
         self.ls_template, self.ls_template_info = _get_ls_template(name)
 
-        self.dataset_transforms = dataset_transforms
+        self.dataset_transforms = rename_transforms(dataset_transforms)
         self.acquisition = _parse_acquisition_data(acquisition)
         self.zarr_shape = image_metadata["shape"]
+        self.template_orientation = {
+                "anterior_to_posterior": 1,
+                "superior_to_inferior": 2,
+                "right_to_left": 0,
+            }
 
     def forward_transform(
         self,
-        points: pd.DataFrame,
+        image: np.array,
         ccf_res=25,
+        reg_ds = None,
     ) -> np.array:
         """
-        Moves points from light sheet state space into CCFv3 space
+        Moves a 3D image from raw image space into CCF space
 
         Parameters
         ----------
-        coordinates : np.array
-            array of points in raw light sheet space
-        input_image: da.array
-            dask array of the image that the points were annotated on
+        image : np.array
+            A 3D volume in raw image space
         ccf_res: int
             The resolution of the ccf used in registration
 
         Returns
         -------
-        transformed_pts : np.array
-            array of points in CCFv3 space
+        registered_iamge : np.array
+            3D volume registered into CCF space
 
         """
-
-        # order columns to align with imaging
-        col_order = ["", "", ""]
-        for dim in self.acquisition["orientation"]:
-            col_order[dim["dimension"]] = dim["name"].lower()
-
-        points = points[col_order]
-        reg_ds = self.acquisition["registration"]
-
-        # downsample points to registration resolution
-        points_ds = points.values / 2**reg_ds
-
-        # get dimensions of registered image for orienting points
-        input_shape = self.zarr_shape
-        if len(input_shape) == 5:
-            input_shape = input_shape[2:]
-
-        reg_dims = [dim / 2**reg_ds for dim in input_shape]
-
+        
         # flip axis based on the template orientation relative to input image
-        orient = utils.get_orientation(self.acquisition["orientation"])
+        img_array = image.astype(np.double)
+        
+        img_out, in_mat, out_mat = utils.check_orientation(
+            img_array,
+            self.acquisition["orientation"],
+            self.template_orientation,
+        )
+        
+        print(f"Image has been oriented to template: {img_out.shape}")
+        
+        spacing_order = np.where(in_mat)[1]
+        
+        if reg_ds is None:
+            print(f'No downsample factor is given. Using factor {self.acquisition["registration"]} based on acquisition')
+            reg_ds = self.acquisition["registration"]
+        else:
+            print(f"Downsample factor of {reg_ds} provided for registration")
+            
+        spacing = [0 ,0, 0]
+        unit_conversion = unit_scale_lut(self.acquisition['orientation'][0]['unit'])
+        
+        for o in self.acquisition['orientation']:
+            spacing[o['dimension']] = float(o['resolution']) * 2**reg_ds * unit_conversion
+        
+        img_spacing = tuple([spacing[s] for s in spacing_order])
+        
+        ants_img = ants.from_numpy(img_out, spacing=img_spacing)
+        ants_img.set_direction(self.ls_template.direction)
+        ants_img.set_origin(self.ls_template.origin)
+            
+        print('################################')
+        print(f"Ants Image: {ants_img}")
+        print(f"Light Sheet Template: {self.ls_template}")
+        print(f"CCF Template: {self.ccf_template}")
+        print('################################')
 
-        _, swapped, mat = utils.get_orientation_transform(
-            orient, self.ls_template_info["orientation"]
+        # apply transform to template
+        aligned_image = ants.apply_transforms(
+            fixed=self.ls_template,
+            moving=ants_img,
+            transformlist=self.dataset_transforms['image_to_ccf'],
         )
 
-        for idx, dim_orient in enumerate(mat.sum(axis=1)):
-            if dim_orient < 0:
-                points_ds[:, idx] = reg_dims[idx] - points_ds[:, idx]
-
-        image_res = [
-            float(dim["resolution"]) for dim in self.acquisition["orientation"]
-        ]
-
-        # scale points and orient axes to template
-        scaling = utils.calculate_scaling(
-            image_res=image_res,
-            downsample=2**reg_ds,
-            ccf_res=ccf_res,
-            direction="forward",
+        aligned_image = ants.apply_transforms(
+            fixed=self.ccf_template,
+            moving=aligned_image,
+            transformlist=self.ccf_transforms['image_to_ccf'],
         )
 
-        scaled_pts = utils.scale_points(points_ds, scaling)
-        orient_pts = scaled_pts[:, swapped]
-
-        # convert points into ccf space
-        ants_pts = utils.convert_to_ants_space(
-            self.ls_template_info, orient_pts
-        )
-
-        template_pts = utils.apply_transforms_to_points(
-            ants_pts,
-            self.dataset_transforms["points_to_ccf"],
-            invert=(True, False),
-        )
-
-        ccf_pts = utils.apply_transforms_to_points(
-            template_pts,
-            self.ccf_transforms["points_to_ccf"],
-            invert=(True, False),
-        )
-
-        ccf_pts = utils.convert_from_ants_space(
-            self.ccf_template_info, ccf_pts
-        )
-
-        _, swapped, _ = utils.get_orientation_transform(
-            self.ls_template_info["orientation"],
-            self.ccf_template_info["orientation"],
-        )
-
-        transformed_pts = ccf_pts[:, swapped]
-        transformed_df = pd.DataFrame(
-            transformed_pts, columns=["AP", "DV", "ML"]
-        )
-
-        return transformed_df
+        return aligned_image.numpy()
 
     def reverse_transform(
         self,
-        points: pd.DataFrame,
+        dataset_image: np.array,
+        image: np.array,
         ccf_res=25,
+        reg_ds = None
     ) -> np.array:
         """
         Moves points from CCFv3 space into light sheet state space.
@@ -451,76 +447,53 @@ class CoordinateTransform:
         transformed_pts : np.array
             array of points in light sheet space
         """
+        
+        img_array = image.astype(np.double)
+        img_spacing = tuple([ccf_res] * 3)
+        
+        ants_img = ants.from_numpy(img_array, spacing=img_spacing)
+        ants_img.set_direction(self.ccf_template.direction)
+        ants_img.set_origin(self.ccf_template.origin)
 
-        # make sure points are ordered correctly
-        cff_order = ["AP", "DV", "ML"]
-        points = points[cff_order].values
-        reg_ds = self.acquisition["registration"]
-
-        # orient points for transformation
-        _, swapped, _ = utils.get_orientation_transform(
-            self.ccf_template_info["orientation"],
-            self.ls_template_info["orientation"],
+        # apply transform to template
+        aligned_image = ants.apply_transforms(
+            fixed=self.ls_template,
+            moving=ants_img,
+            transformlist=self.ccf_transforms['image_to_ccf'],
         )
-
-        ccf_pts = points[:, swapped]
-        ordered_cols = [cff_order[c] for c in swapped]
-
-        # convert points into raw space
-        ants_pts = utils.convert_to_ants_space(self.ccf_template_info, ccf_pts)
-
-        template_pts = utils.apply_transforms_to_points(
-            ants_pts,
-            self.ccf_transforms["points_from_ccf"],
-            invert=(False, False),
+        
+        if reg_ds is None:
+            print(f'No downsample factor is given. Using factor {self.acquisition["registration"]} based on acquisition')
+            reg_ds = self.acquisition["registration"]
+        else:
+            print(f"Downsample factor of {reg_ds} provided for registration")
+        
+        dataset_array = dataset_image.astype(np.double)
+        
+        img_out, in_mat, out_mat = utils.check_orientation(
+            dataset_array,
+            self.acquisition["orientation"],
+            self.template_orientation,
         )
+        
+        spacing_order = np.where(in_mat)[1]
+        
+        spacing = [0 ,0, 0]
+        unit_conversion = unit_scale_lut(self.acquisition['orientation'][0]['unit'])
+        
+        for o in self.acquisition['orientation']:
+            spacing[o['dimension']] = (float(o['resolution']) * 2**reg_ds) * unit_conversion
+        
+        img_spacing = tuple([spacing[s] for s in spacing_order])
+        
+        ants_dataset = ants.from_numpy(img_out, spacing=img_spacing)
 
-        raw_pts = utils.apply_transforms_to_points(
-            template_pts,
-            self.dataset_transforms["points_from_ccf"],
-            invert=(False, False),
+
+        aligned_image = ants.apply_transforms(
+            fixed=ants_dataset,
+            moving=aligned_image,
+            transformlist=self.ls_transforms['image_to_ccf'],
         )
-
-        raw_pts = utils.convert_from_ants_space(self.ls_template_info, raw_pts)
-
-        # orient axes to original image
-        orient = utils.get_orientation(self.acquisition["orientation"])
-
-        _, swapped, mat = utils.get_orientation_transform(
-            self.ls_template_info["orientation"], orient
-        )
-
-        orient_pts = raw_pts[:, swapped]
-        ordered_cols = [ordered_cols[c] for c in swapped]
-
-        # scale points
-        image_res = [
-            float(dim["resolution"]) for dim in self.acquisition["orientation"]
-        ]
-
-        scaling = utils.calculate_scaling(
-            image_res=image_res,
-            downsample=2**reg_ds,
-            ccf_res=ccf_res,
-            direction="reverse",
-        )
-
-        scaled_pts = utils.scale_points(orient_pts, scaling)
-
-        # get dimensions of registered image for orienting points
-        input_shape = self.zarr_shape
-        if len(input_shape) == 5:
-            input_shape = input_shape[2:]
-
-        reg_dims = [dim / 2**reg_ds for dim in input_shape]
-
-        for idx, dim_orient in enumerate(mat.sum(axis=1)):
-            if dim_orient < 0:
-                scaled_pts[:, idx] = reg_dims[idx] - scaled_pts[:, idx]
-
-        # upsample points from registration to raw image space
-        transformed_pts = scaled_pts * 2**reg_ds
-
-        transformed_df = pd.DataFrame(transformed_pts, columns=ordered_cols)
-
-        return transformed_df
+        
+        
+        return aligned_image.numpy()

@@ -8,9 +8,96 @@ Created on Thu May 29 09:59:09 2025
 
 
 import ants
-
 import numpy as np
 import pandas as pd
+
+def rotate_image(img: np.array, in_mat: np.array, reverse: bool):
+    """
+    Rotates axes of a volume based on orientation matrix.
+
+    Parameters
+    ----------
+    img: np.array
+        Image volume to be rotated
+    in_mat: np.array
+        3x3 matrix with cols indicating order of input array and rows
+        indicating location to rotate axes into
+
+    Returns
+    -------
+    img_out: np.array
+        Image after being rotated into new orientation
+    out_mat: np.array
+        axes correspondance after rotating array. Should always be an
+        identity matrix
+    reverse: bool
+        if you are doing forward or reverse registration
+
+    """
+
+    if not reverse:
+        in_mat = in_mat.T
+
+    original, swapped = np.where(in_mat)
+    img_out = np.moveaxis(img, original, swapped)
+
+    out_mat = in_mat[:, swapped]
+    for c, row in enumerate(in_mat):
+        val = np.where(row)[0][0]
+        if row[val] == -1:
+            img_out = np.flip(img_out, c)
+            out_mat[val, val] *= -1
+
+    return img_out, out_mat
+
+
+def check_orientation(img: np.array, params: dict, orientations: dict):
+    """
+    Checks aquisition orientation an makes sure it is aligned to the CCF. The
+    CCF orientation is:
+        - superior_to_inferior
+        - left_to_right
+        - anterior_to_posterior
+
+    Parameters
+    ----------
+    img : np.array
+        The raw image in its aquired orientation
+    params : dict
+        The orientation information from processing_manifest.json
+    orientations: dict
+        The axis order of the CCF reference atals
+
+    Returns
+    -------
+    img_out : np.array
+        The raw image oriented to the CCF
+    """
+
+    orient_mat = np.zeros((3, 3))
+    acronym = ["", "", ""]
+
+    for k, vals in enumerate(params):
+        direction = vals["direction"].lower()
+        dim = vals["dimension"]
+        if direction in orientations.keys():
+            ref_axis = orientations[direction]
+            orient_mat[dim, ref_axis] = 1
+            acronym[dim] = direction[0]
+        else:
+            direction_flip = "_".join(direction.split("_")[::-1])
+            ref_axis = orientations[direction_flip]
+            orient_mat[dim, ref_axis] = -1
+            acronym[dim] = direction[0]
+
+    # check because there was a bug that allowed for invalid spl orientation
+    # all vals should be postitive so just taking absolute value of matrix
+    if "".join(acronym) == "spl":
+        orient_mat = abs(orient_mat)
+
+    img_out, out_mat = rotate_image(img, orient_mat, False)
+
+    return img_out, orient_mat, out_mat
 
 
 def get_orientation(params: dict) -> str:
@@ -42,7 +129,10 @@ def get_orientation(params: dict) -> str:
 
     return "".join(orient)
 
-def get_orientation_transform(orientation_in: str, orientation_out: str) -> tuple:
+
+def get_orientation_transform(
+    orientation_in: str, orientation_out: str
+) -> tuple:
     """
     Takes orientation acronyms (i.e. spr) and creates a convertion matrix for
     converting from one to another
@@ -82,14 +172,12 @@ def get_orientation_transform(orientation_in: str, orientation_out: str) -> tupl
 
     return original, swapped, transform_matrix
 
+
 def calculate_scaling(
-        image_res: list, 
-        downsample: int, 
-        ccf_res: int, 
-        direction: str
+    image_res: list, downsample: int, ccf_res: int, direction: str
 ) -> list:
     """
-    
+
 
     Parameters
     ----------
@@ -108,16 +196,16 @@ def calculate_scaling(
         DESCRIPTION.
 
     """
-    
+
     ds_res = [res * downsample for res in image_res]
-    
-    if direction =='forward':
+
+    if direction == "forward":
         values = zip(ds_res, [ccf_res] * 3)
-    elif direction == 'reverse':
+    elif direction == "reverse":
         values = zip([ccf_res] * 3, ds_res)
-        
-    return [res_1/res_2 for res_1, res_2 in values]
-    
+
+    return [res_1 / res_2 for res_1, res_2 in values]
+
 
 def scale_points(points: list, scale: list) -> np.ndarray:
     """
@@ -130,7 +218,7 @@ def scale_points(points: list, scale: list) -> np.ndarray:
         list of coordinates tin a given resolution
 
     scale : list
-        the scaling metric between the resolution of the annotation points 
+        the scaling metric between the resolution of the annotation points
         and the resolution the points are being moved
 
     Returns
@@ -147,6 +235,7 @@ def scale_points(points: list, scale: list) -> np.ndarray:
         )
 
     return np.array(scaled_points)
+
 
 def convert_to_ants_space(ants_parameters: dict, index_pts: np.ndarray):
     """
@@ -178,6 +267,7 @@ def convert_to_ants_space(ants_parameters: dict, index_pts: np.ndarray):
 
     return ants_pts
 
+
 def convert_from_ants_space(ants_parameters: dict, physical_pts: np.ndarray):
     """
     Convert points from the physical space of an ANTsImage and places
@@ -206,6 +296,7 @@ def convert_from_ants_space(ants_parameters: dict, physical_pts: np.ndarray):
         pts[:, dim] /= ants_parameters["scale"][dim]
 
     return pts
+
 
 def apply_transforms_to_points(
     ants_pts: np.ndarray, transforms: list, invert: tuple
