@@ -291,7 +291,7 @@ def rename_transforms(transforms: dict) -> dict:
 
     """
 
-    rename_map = {"points_to_ccf": "ccf_from_image", "points_from_ccf": "image_to_ccf"} 
+    rename_map = {"points_to_ccf": "ccf_to_ls", "points_from_ccf": "ls_to_ccf"} 
     transforms = {rename_map.get(k, k): v for k, v in transforms.items()}
 
     return transforms
@@ -413,13 +413,13 @@ class ImageTransform:
         aligned_image = ants.apply_transforms(
             fixed=self.ls_template,
             moving=ants_img,
-            transformlist=self.dataset_transforms['image_to_ccf'],
+            transformlist=self.dataset_transforms['ls_to_ccf'],
         )
 
         aligned_image = ants.apply_transforms(
             fixed=self.ccf_template,
             moving=aligned_image,
-            transformlist=self.ccf_transforms['image_to_ccf'],
+            transformlist=self.ccf_transforms['ls_to_ccf'],
         )
 
         return aligned_image.numpy()
@@ -459,7 +459,7 @@ class ImageTransform:
         aligned_image = ants.apply_transforms(
             fixed=self.ls_template,
             moving=ants_img,
-            transformlist=self.ccf_transforms['image_to_ccf'],
+            transformlist=self.ccf_transforms['ccf_to_ls'],
         )
         
         if reg_ds is None:
@@ -492,7 +492,7 @@ class ImageTransform:
         aligned_image = ants.apply_transforms(
             fixed=ants_dataset,
             moving=aligned_image,
-            transformlist=self.ls_transforms['image_to_ccf'],
+            transformlist=self.dataset_transforms['ccf_to_ls'],
         )
         
         
