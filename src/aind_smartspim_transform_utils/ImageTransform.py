@@ -492,6 +492,8 @@ class ImageTransform:
         img_spacing = tuple([spacing[s] for s in spacing_order])
         
         ants_dataset = ants.from_numpy(img_out, spacing=img_spacing)
+        ants_dataset.set_direction(self.ls_template.direction)
+        ants_dataset.set_origin(self.ls_template.origin)
         
         print('################################')
         print(f"Input Image: {ants_img}")
