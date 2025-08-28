@@ -429,7 +429,7 @@ class ImageTransform:
         dataset_image: np.array,
         image: np.array,
         ccf_res=25,
-        units = 'millimeter',
+        units = 'micrometer',
         reg_ds = None
     ) -> np.array:
         """
@@ -453,7 +453,7 @@ class ImageTransform:
         img_spacing = tuple([ccf_res] * 3)
         
         unit_conversion = unit_scale_lut(units)
-        img_spacing = [float(res) * unit_conversion for res in img_spacing]
+        img_spacing = tuple([float(res) * unit_conversion for res in img_spacing])
         
         ants_img = ants.from_numpy(img_array, spacing=img_spacing)
         ants_img.set_direction(self.ccf_template.direction)
