@@ -464,6 +464,7 @@ class ImageTransform:
             fixed=self.ls_template,
             moving=ants_img,
             transformlist=self.ccf_transforms['ccf_to_ls'],
+            whichtoinvert=[True, False] 
         )
         
         if reg_ds is None:
@@ -478,6 +479,7 @@ class ImageTransform:
             dataset_array,
             self.acquisition["orientation"],
             self.template_orientation,
+            whichtoinvert=[True, False] 
         )
         
         spacing_order = np.where(in_mat)[1]
