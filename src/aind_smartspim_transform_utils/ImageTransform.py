@@ -429,6 +429,7 @@ class ImageTransform:
         dataset_image: np.array,
         image: np.array,
         ccf_res=25,
+        units = 'millimeter',
         reg_ds = None
     ) -> np.array:
         """
@@ -450,6 +451,9 @@ class ImageTransform:
         
         img_array = image.astype(np.double)
         img_spacing = tuple([ccf_res] * 3)
+        
+        unit_conversion = unit_scale_lut(units)
+        img_spacing = [float(res) * unit_conversion for res in img_spacing]
         
         ants_img = ants.from_numpy(img_array, spacing=img_spacing)
         ants_img.set_direction(self.ccf_template.direction)
@@ -487,6 +491,12 @@ class ImageTransform:
         img_spacing = tuple([spacing[s] for s in spacing_order])
         
         ants_dataset = ants.from_numpy(img_out, spacing=img_spacing)
+        
+        print('################################')
+        print(f"Input Image: {ants_img}")
+        print(f"Light Sheet Template: {self.ls_template}")
+        print(f"Output Image: {ants_dataset}")
+        print('################################')
 
 
         aligned_image = ants.apply_transforms(
