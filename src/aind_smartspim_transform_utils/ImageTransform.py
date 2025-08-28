@@ -478,8 +478,7 @@ class ImageTransform:
         img_out, in_mat, out_mat = utils.check_orientation(
             dataset_array,
             self.acquisition["orientation"],
-            self.template_orientation,
-            whichtoinvert=[True, False] 
+            self.template_orientation
         )
         
         spacing_order = np.where(in_mat)[1]
@@ -505,6 +504,7 @@ class ImageTransform:
             fixed=ants_dataset,
             moving=aligned_image,
             transformlist=self.dataset_transforms['ccf_to_ls'],
+            whichtoinvert=[True, False] 
         )
         
         
