@@ -317,7 +317,7 @@ class CoordinateTransform:
     def __init__(  # pragma: no cover
         self,
         name: str,
-        dataset_transforms: list,
+        dataset_transforms: dict,
         acquisition: dict,
         image_metadata: dict,
     ):
@@ -332,17 +332,18 @@ class CoordinateTransform:
     def forward_transform(
         self,
         points: pd.DataFrame,
+        to_ccf: bool = False,
         ccf_res=25,
     ) -> np.array:
         """
-        Moves points from light sheet state space into CCFv3 space
+        Moves points from light sheet state space into light sheet template or CCFv3 space
 
         Parameters
         ----------
-        coordinates : np.array
+        points : np.array
             array of points in raw light sheet space
-        input_image: da.array
-            dask array of the image that the points were annotated on
+        to_ccf: bool
+            Whether to move into CCFv3 space or light sheet template space
         ccf_res: int
             The resolution of the ccf used in registration
 
@@ -358,18 +359,8 @@ class CoordinateTransform:
         for dim in self.acquisition["orientation"]:
             col_order[dim["dimension"]] = dim["name"].lower()
 
-        points = points[col_order]
+        points = points[col_order].values
         reg_ds = self.acquisition["registration"]
-
-        # downsample points to registration resolution
-        points_ds = points.values / 2**reg_ds
-
-        # get dimensions of registered image for orienting points
-        input_shape = self.zarr_shape
-        if len(input_shape) == 5:
-            input_shape = input_shape[2:]
-
-        reg_dims = [dim / 2**reg_ds for dim in input_shape]
 
         # flip axis based on the template orientation relative to input image
         orient = utils.get_orientation(self.acquisition["orientation"])
@@ -380,7 +371,7 @@ class CoordinateTransform:
 
         for idx, dim_orient in enumerate(mat.sum(axis=1)):
             if dim_orient < 0:
-                points_ds[:, idx] = reg_dims[idx] - points_ds[:, idx]
+                points[:, idx] = self.zarr_shape[idx] - points[:, idx]
 
         image_res = [
             float(dim["resolution"]) for dim in self.acquisition["orientation"]
@@ -394,7 +385,7 @@ class CoordinateTransform:
             direction="forward",
         )
 
-        scaled_pts = utils.scale_points(points_ds, scaling)
+        scaled_pts = utils.scale_points(points, scaling)
         orient_pts = scaled_pts[:, swapped]
 
         # convert points into ccf space
@@ -402,31 +393,41 @@ class CoordinateTransform:
             self.ls_template_info, orient_pts
         )
 
-        template_pts = utils.apply_transforms_to_points(
+        transformed_points = utils.apply_transforms_to_points(
             ants_pts,
             self.dataset_transforms["points_to_ccf"],
             invert=(True, False),
         )
 
-        ccf_pts = utils.apply_transforms_to_points(
-            template_pts,
-            self.ccf_transforms["points_to_ccf"],
-            invert=(True, False),
-        )
+        if to_ccf:
+            transformed_points = utils.apply_transforms_to_points(
+                transformed_points,
+                self.ccf_transforms["points_to_ccf"],
+                invert=(True, False),
+            )
 
-        ccf_pts = utils.convert_from_ants_space(
-            self.ccf_template_info, ccf_pts
-        )
+            transformed_points = utils.convert_from_ants_space(
+                self.ccf_template_info, transformed_points
+            )
 
-        _, swapped, _ = utils.get_orientation_transform(
-            self.ls_template_info["orientation"],
-            self.ccf_template_info["orientation"],
-        )
+            _, swapped, _ = utils.get_orientation_transform(
+                self.ls_template_info["orientation"],
+                self.ccf_template_info["orientation"],
+            )
 
-        transformed_pts = ccf_pts[:, swapped]
-        transformed_df = pd.DataFrame(
-            transformed_pts, columns=["AP", "DV", "ML"]
-        )
+            transformed_points = transformed_points[:, swapped]
+
+            transformed_df = pd.DataFrame(
+                transformed_points, columns=["AP", "DV", "ML"]
+            )
+        else:
+            transformed_points = utils.convert_from_ants_space(
+                self.ls_template_info, transformed_points
+            )
+
+            transformed_df = pd.DataFrame(
+                transformed_points, columns=["ML", "AP", "DV"]
+            )
 
         return transformed_df
 
