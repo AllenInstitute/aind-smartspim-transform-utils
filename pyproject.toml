@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "aind-smartspim-transform-utils"
 description = "Transforms coordinates between SmartSPIM template and CCFv3"
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [
     {name = "Allen Institute for Neural Dynamics"}
 ]
@@ -18,13 +18,9 @@ readme = "README.md"
 dynamic = ["version"]
 
 dependencies = [
-    'ome-zarr==0.8.3',
-    'zarr==2.18.0',
-    'dask[distributed]==2024.4.1',
-    'antspyx==0.4.2',
-    'numpy==1.23.5',
-    'boto3==1.37.2',
-    'imlib==0.1.3'
+    "antspyx>=0.6.1",
+    "boto3>=1.40.37",
+    "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]

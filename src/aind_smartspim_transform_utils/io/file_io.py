@@ -14,7 +14,6 @@ import ants
 import boto3
 import numpy as np
 import pandas as pd
-from imlib.IO.cells import get_cells
 from tqdm import tqdm
 
 
@@ -145,6 +144,7 @@ def _download_data_from_s3(data_folder: str, files: list, dest: str):
 
 
 def _read_xml_as_df(fpath: str) -> pd.DataFrame:  # pragma: no cover
+    from imlib.IO.cells import get_cells
     file_cells = get_cells(fpath)
 
     cells = []
