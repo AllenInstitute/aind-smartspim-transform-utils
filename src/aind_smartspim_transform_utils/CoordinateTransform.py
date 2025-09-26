@@ -5,7 +5,7 @@ Created on Wed May 28 16:21:46 2025
 
 @author: nicholas.lusk
 """
-
+import json
 import os
 from glob import glob
 
@@ -365,7 +365,7 @@ class CoordinateTransform:
         points = points[col_order].values
 
         # flip axis based on the template orientation relative to input image
-        orient = utils.get_orientation([x.model_dump() for x in self.acquisition_axes])
+        orient = utils.get_orientation([json.loads(x.model_dump_json()) for x in self.acquisition_axes])
 
         _, swapped, mat = utils.get_orientation_transform(
             orient, self.ls_template_info["orientation"]
