@@ -332,8 +332,9 @@ class CoordinateTransform:
     def forward_transform(
         self,
         points: pd.DataFrame,
+        points_resolution: list[float],
         to_ccf: bool = False,
-        ccf_res=25,
+        template_resolution: int = 25,
     ) -> np.array:
         """
         Moves points from light sheet state space into light sheet template or CCFv3 space
@@ -342,15 +343,17 @@ class CoordinateTransform:
         ----------
         points : np.array
             array of points in raw light sheet space
+        points_resolution: list[float]
+            Resolution of the input points in micrometres
         to_ccf: bool
             Whether to move into CCFv3 space or light sheet template space
-        ccf_res: int
-            The resolution of the ccf used in registration
+        template_resolution: int
+            The resolution in micrometres of the light sheet template used in registration
 
         Returns
         -------
         transformed_pts : np.array
-            array of points in CCFv3 space
+            array of points in light sheet template or CCFv3 space
 
         """
 
@@ -360,7 +363,6 @@ class CoordinateTransform:
             col_order[dim["dimension"]] = dim["name"].lower()
 
         points = points[col_order].values
-        reg_ds = self.acquisition["registration"]
 
         # flip axis based on the template orientation relative to input image
         orient = utils.get_orientation(self.acquisition["orientation"])
@@ -373,18 +375,8 @@ class CoordinateTransform:
             if dim_orient < 0:
                 points[:, idx] = self.zarr_shape[idx] - points[:, idx]
 
-        image_res = [
-            float(dim["resolution"]) for dim in self.acquisition["orientation"]
-        ]
-
         # scale points and orient axes to template
-        scaling = utils.calculate_scaling(
-            image_res=image_res,
-            downsample=2**reg_ds,
-            ccf_res=ccf_res,
-            direction="forward",
-        )
-
+        scaling = [res_1 / res_2 for res_1, res_2 in zip(points_resolution, [template_resolution] * 3)]
         scaled_pts = utils.scale_points(points, scaling)
         orient_pts = scaled_pts[:, swapped]
 
