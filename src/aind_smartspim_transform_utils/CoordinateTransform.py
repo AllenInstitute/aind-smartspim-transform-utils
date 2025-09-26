@@ -15,6 +15,7 @@ import pandas as pd
 from aind_smartspim_transform_utils import base_dir
 from aind_smartspim_transform_utils.io import file_io as fio
 from aind_smartspim_transform_utils.utils import utils
+from aind_smartspim_transform_utils.utils.utils import AcquisitionAxis
 
 
 def _check_path(name: str, sub_folder: str):  # pragma: no cover
@@ -308,8 +309,7 @@ class CoordinateTransform:
     dataset_transforms: list
         A list of the dataset specific transforms you want to use
 
-    acquisition: dict
-        metadata for your dataset loaded from the acquisition.json
+    acquisition_axes: `list[AcquisitionAxes]`
 
     image_metadata: dict
     """
@@ -318,7 +318,7 @@ class CoordinateTransform:
         self,
         name: str,
         dataset_transforms: dict,
-        acquisition: dict,
+        acquisition_axes: list[AcquisitionAxis],
         image_metadata: dict,
     ):
         self.ccf_transforms = _get_ccf_transforms(name)
@@ -326,7 +326,7 @@ class CoordinateTransform:
         self.ls_template, self.ls_template_info = _get_ls_template(name)
 
         self.dataset_transforms = dataset_transforms
-        self.acquisition = _parse_acquisition_data(acquisition)
+        self.acquisition_axes: list[AcquisitionAxis] = acquisition_axes
         self.zarr_shape = image_metadata["shape"]
 
     def forward_transform(
@@ -359,13 +359,13 @@ class CoordinateTransform:
 
         # order columns to align with imaging
         col_order = ["", "", ""]
-        for dim in self.acquisition["orientation"]:
-            col_order[dim["dimension"]] = dim["name"].lower()
+        for dim in self.acquisition_axes:
+            col_order[dim.dimension] = dim.name.value.lower()
 
         points = points[col_order].values
 
         # flip axis based on the template orientation relative to input image
-        orient = utils.get_orientation(self.acquisition["orientation"])
+        orient = utils.get_orientation([x.model_dump() for x in self.acquisition_axes])
 
         _, swapped, mat = utils.get_orientation_transform(
             orient, self.ls_template_info["orientation"]

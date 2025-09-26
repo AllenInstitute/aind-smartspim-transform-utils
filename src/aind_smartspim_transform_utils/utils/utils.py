@@ -5,11 +5,12 @@ Created on Thu May 29 09:59:09 2025
 
 @author: nicholas.lusk
 """
-
+from enum import Enum
 
 import ants
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel
 
 def rotate_image(img: np.array, in_mat: np.array, reverse: bool):
     """
@@ -100,7 +101,7 @@ def check_orientation(img: np.array, params: dict, orientations: dict):
     return img_out, orient_mat, out_mat
 
 
-def get_orientation(params: dict) -> str:
+def get_orientation(params: list[dict]) -> str:
     """
     Fetch aquisition orientation to identify origin for cell locations
     from cellfinder. Important for read_xml function in quantification
@@ -108,7 +109,7 @@ def get_orientation(params: dict) -> str:
 
     Parameters
     ----------
-    params : dict
+    params : list[dict]
         The orientation information from processing_manifest.json
 
     Returns
@@ -325,3 +326,23 @@ def apply_transforms_to_points(
     )
 
     return np.array(transformed_pts)
+
+
+class AcquisitionDirection(Enum):
+    LEFT_TO_RIGHT = 'Left_to_right'
+    RIGHT_TO_LEFT = 'Right_to_left'
+    POSTERIOR_TO_ANTERIOR = 'Posterior_to_anterior'
+    ANTERIOR_TO_POSTERIOR = 'Anterior_to_posterior'
+    SUPERIOR_TO_INFERIOR = 'Superior_to_inferior'
+    INFERIOR_TO_SUPERIOR = 'Inferior_to_superior'
+
+class AcqusitionAxesName(Enum):
+    X = 'X'
+    Y = 'Y'
+    Z = 'Z'
+
+class AcquisitionAxis(BaseModel):
+    dimension: int
+    direction: AcquisitionDirection
+    name: AcqusitionAxesName
+    unit: str

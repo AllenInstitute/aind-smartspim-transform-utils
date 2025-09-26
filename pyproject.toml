@@ -20,6 +20,7 @@ dynamic = ["version"]
 dependencies = [
     "antspyx>=0.6.1",
     "boto3>=1.40.37",
+    "pydantic>=2.11.9",
     "tqdm>=4.67.1",
 ]
 
