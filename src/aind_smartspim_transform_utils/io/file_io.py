@@ -8,6 +8,7 @@ Created on Fri May 30 13:59:08 2025
 
 import json
 import os
+from dataclasses import dataclass
 from glob import glob
 
 import ants
@@ -347,6 +348,24 @@ def load_cell_locations(  # pragma: no cover
 
     return df
 
+
+@dataclass
+class AntsImageParameters:
+    orientation: str
+    dims: int
+    scale: tuple[float]
+    origin: tuple[float]
+    direction: np.ndarray
+
+    @classmethod
+    def from_ants_image(cls, image: ants.ANTsImage):
+        return cls(
+            orientation=image.orientation,
+            dims=image.dimension,
+            scale=image.spacing,
+            origin=image.origin,
+            direction=image.direction[np.where(image.direction != 0)]   # noqa
+        )
 
 def load_ants_nifti(filepath: str) -> dict:
     """

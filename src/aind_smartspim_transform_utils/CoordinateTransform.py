@@ -9,11 +9,13 @@ import json
 import os
 from glob import glob
 
+import ants
 import numpy as np
 import pandas as pd
 
 from aind_smartspim_transform_utils import base_dir
 from aind_smartspim_transform_utils.io import file_io as fio
+from aind_smartspim_transform_utils.io.file_io import AntsImageParameters
 from aind_smartspim_transform_utils.utils import utils
 from aind_smartspim_transform_utils.utils.utils import AcquisitionAxis
 
@@ -320,10 +322,29 @@ class CoordinateTransform:
         dataset_transforms: dict,
         acquisition_axes: list[AcquisitionAxis],
         image_metadata: dict,
+        ls_template: ants.ANTsImage,
+        to_ccf: bool = False,
     ):
+        """
+
+        Parameters
+        ----------
+        name
+        dataset_transforms
+        acquisition_axes
+        image_metadata
+        to_ccf: bool
+            Whether to move into CCFv3 space or light sheet template space
+        """
+        self._to_ccf = to_ccf
         self.ccf_transforms = _get_ccf_transforms(name)
-        self.ccf_template, self.ccf_template_info = _get_ccf_template(name)
-        self.ls_template, self.ls_template_info = _get_ls_template(name)
+
+        if self._to_ccf:
+            self.ccf_template, _ = _get_ccf_template(name)
+            self.ccf_template_info = AntsImageParameters.from_ants_image(image=self.ccf_template)
+
+        self.ls_template = ls_template
+        self.ls_template_info = AntsImageParameters.from_ants_image(image=ls_template)
 
         self.dataset_transforms = dataset_transforms
         self.acquisition_axes: list[AcquisitionAxis] = acquisition_axes
@@ -346,7 +367,7 @@ class CoordinateTransform:
         orient = utils.get_orientation([json.loads(x.model_dump_json()) for x in self.acquisition_axes])
 
         _, swapped, mat = utils.get_orientation_transform(
-            orient, self.ls_template_info["orientation"]
+            orient, self.ls_template_info.orientation
         )
 
         for idx, dim_orient in enumerate(mat.sum(axis=1)):
@@ -368,7 +389,6 @@ class CoordinateTransform:
         self,
         points: pd.DataFrame,
         points_resolution: list[float],
-        to_ccf: bool = False,
         template_resolution: int = 25,
     ) -> np.array:
         """
@@ -380,8 +400,6 @@ class CoordinateTransform:
             array of points in raw light sheet space
         points_resolution: list[float]
             Resolution of the input points in micrometres
-        to_ccf: bool
-            Whether to move into CCFv3 space or light sheet template space
         template_resolution: int
             The resolution in micrometres of the light sheet template used in registration
 
@@ -396,13 +414,13 @@ class CoordinateTransform:
             points_resolution=points_resolution,
             template_resolution=template_resolution
         )
-        
+
         transformed_points = utils.apply_transforms_to_points(
             ants_pts,
             self.dataset_transforms["points_to_ccf"],
             invert=(True, False),
         )
-        if to_ccf:
+        if self._to_ccf:
             transformed_points = utils.apply_transforms_to_points(
                 transformed_points,
                 self.ccf_transforms["points_to_ccf"],
@@ -414,8 +432,8 @@ class CoordinateTransform:
             )
 
             _, swapped, _ = utils.get_orientation_transform(
-                self.ls_template_info["orientation"],
-                self.ccf_template_info["orientation"],
+                self.ls_template_info.orientation,
+                self.ccf_template_info.orientation,
             )
 
             transformed_points = transformed_points[:, swapped]

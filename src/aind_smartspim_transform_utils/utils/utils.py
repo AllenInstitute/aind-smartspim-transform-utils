@@ -12,6 +12,9 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel
 
+from aind_smartspim_transform_utils.io.file_io import AntsImageParameters
+
+
 def rotate_image(img: np.array, in_mat: np.array, reverse: bool):
     """
     Rotates axes of a volume based on orientation matrix.
@@ -238,14 +241,14 @@ def scale_points(points: list, scale: list) -> np.ndarray:
     return np.array(scaled_points)
 
 
-def convert_to_ants_space(ants_parameters: dict, index_pts: np.ndarray):
+def convert_to_ants_space(ants_parameters: AntsImageParameters, index_pts: np.ndarray):
     """
     Convert points from "index" space and places them into the physical space
     required for applying ants transforms for a given ANTsImage
 
     Parameters
     ----------
-    ants_parameters : dict
+    ants_parameters : `AntsImageParameters`
         parameters of the ANTsImage physical space that you are converting
         the points
     index_pts : np.ndarray
@@ -261,22 +264,22 @@ def convert_to_ants_space(ants_parameters: dict, index_pts: np.ndarray):
 
     ants_pts = index_pts.copy()
 
-    for dim in range(ants_parameters["dims"]):
-        ants_pts[:, dim] *= ants_parameters["scale"][dim]
-        ants_pts[:, dim] *= ants_parameters["direction"][dim]
-        ants_pts[:, dim] += ants_parameters["origin"][dim]
+    for dim in range(ants_parameters.dims):
+        ants_pts[:, dim] *= ants_parameters.scale[dim]
+        ants_pts[:, dim] *= ants_parameters.direction[dim]
+        ants_pts[:, dim] += ants_parameters.origin[dim]
 
     return ants_pts
 
 
-def convert_from_ants_space(ants_parameters: dict, physical_pts: np.ndarray):
+def convert_from_ants_space(template_parameters: AntsImageParameters, physical_pts: np.ndarray):
     """
     Convert points from the physical space of an ANTsImage and places
     them into the "index" space required for visualizing
 
     Parameters
     ----------
-    template_parameters : dict
+    template_parameters : `AntsImageParameters`
         parameters of the ANTsImage physical space from where you are
         converting the points
     physical_pts : np.ndarray
@@ -291,10 +294,10 @@ def convert_from_ants_space(ants_parameters: dict, physical_pts: np.ndarray):
 
     pts = physical_pts.copy()
 
-    for dim in range(ants_parameters["dims"]):
-        pts[:, dim] -= ants_parameters["origin"][dim]
-        pts[:, dim] *= ants_parameters["direction"][dim]
-        pts[:, dim] /= ants_parameters["scale"][dim]
+    for dim in range(template_parameters.dims):
+        pts[:, dim] -= template_parameters.origin[dim]
+        pts[:, dim] *= template_parameters.direction[dim]
+        pts[:, dim] /= template_parameters.scale[dim]
 
     return pts
 
