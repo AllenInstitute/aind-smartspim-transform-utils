@@ -362,13 +362,7 @@ class CoordinateTransform:
         ants_pts = utils.convert_to_ants_space(
             self.ls_template_info, orient_pts
         )
-
-        transformed_points = utils.apply_transforms_to_points(
-            ants_pts,
-            self.dataset_transforms["points_to_ccf"],
-            invert=(True, False),
-        )
-        return transformed_points
+        return ants_pts
 
     def forward_transform(
         self,
@@ -397,12 +391,17 @@ class CoordinateTransform:
             array of points in light sheet template or CCFv3 space
 
         """
-        transformed_points = self.prepare_points_for_forward_transform(
+        ants_pts = self.prepare_points_for_forward_transform(
             points=points,
             points_resolution=points_resolution,
             template_resolution=template_resolution
         )
-
+        
+        transformed_points = utils.apply_transforms_to_points(
+            ants_pts,
+            self.dataset_transforms["points_to_ccf"],
+            invert=(True, False),
+        )
         if to_ccf:
             transformed_points = utils.apply_transforms_to_points(
                 transformed_points,
