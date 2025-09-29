@@ -329,34 +329,12 @@ class CoordinateTransform:
         self.acquisition_axes: list[AcquisitionAxis] = acquisition_axes
         self.zarr_shape = image_metadata["shape"]
 
-    def forward_transform(
+    def prepare_points_for_forward_transform(
         self,
         points: pd.DataFrame,
         points_resolution: list[float],
-        to_ccf: bool = False,
         template_resolution: int = 25,
-    ) -> np.array:
-        """
-        Moves points from light sheet state space into light sheet template or CCFv3 space
-
-        Parameters
-        ----------
-        points : np.array
-            array of points in raw light sheet space
-        points_resolution: list[float]
-            Resolution of the input points in micrometres
-        to_ccf: bool
-            Whether to move into CCFv3 space or light sheet template space
-        template_resolution: int
-            The resolution in micrometres of the light sheet template used in registration
-
-        Returns
-        -------
-        transformed_pts : np.array
-            array of points in light sheet template or CCFv3 space
-
-        """
-
+    ) -> np.ndarray:
         # order columns to align with imaging
         col_order = ["", "", ""]
         for dim in self.acquisition_axes:
@@ -389,6 +367,40 @@ class CoordinateTransform:
             ants_pts,
             self.dataset_transforms["points_to_ccf"],
             invert=(True, False),
+        )
+        return transformed_points
+
+    def forward_transform(
+        self,
+        points: pd.DataFrame,
+        points_resolution: list[float],
+        to_ccf: bool = False,
+        template_resolution: int = 25,
+    ) -> np.array:
+        """
+        Moves points from light sheet state space into light sheet template or CCFv3 space
+
+        Parameters
+        ----------
+        points : np.array
+            array of points in raw light sheet space
+        points_resolution: list[float]
+            Resolution of the input points in micrometres
+        to_ccf: bool
+            Whether to move into CCFv3 space or light sheet template space
+        template_resolution: int
+            The resolution in micrometres of the light sheet template used in registration
+
+        Returns
+        -------
+        transformed_pts : np.array
+            array of points in light sheet template or CCFv3 space
+
+        """
+        transformed_points = self.prepare_points_for_forward_transform(
+            points=points,
+            points_resolution=points_resolution,
+            template_resolution=template_resolution
         )
 
         if to_ccf:
