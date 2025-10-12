@@ -357,6 +357,7 @@ class CoordinateTransform:
             array of points in CCFv3 space
 
         """
+        ccf_template_info = AntsImageParameters.from_ants_image(image=self.ccf_template)
         ls_template_info = AntsImageParameters.from_ants_image(image=self.ls_template)
 
         # order columns to align with imaging
@@ -414,12 +415,24 @@ class CoordinateTransform:
             invert=(True, False),
         )
 
-        transformed_pts = utils.convert_from_ants_space(
-            ls_template_info, template_pts
+        ccf_pts = utils.apply_transforms_to_points(
+            template_pts,
+            self.ccf_transforms["points_to_ccf"],
+            invert=(True, False),
         )
 
+        ccf_pts = utils.convert_from_ants_space(
+            ccf_template_info, ccf_pts
+        )
+
+        _, swapped, _ = utils.get_orientation_transform(
+            ls_template_info.orientation,
+            ccf_template_info.orientation,
+        )
+
+        transformed_pts = ccf_pts[:, swapped]
         transformed_df = pd.DataFrame(
-            transformed_pts, columns=["ML", "AP", "DV"]
+            transformed_pts, columns=["AP", "DV", "ML"]
         )
 
         return transformed_df
@@ -445,6 +458,8 @@ class CoordinateTransform:
         transformed_pts : np.array
             array of points in light sheet space
         """
+        ccf_template_info = AntsImageParameters.from_ants_image(image=self.ccf_template)
+        ls_template_info = AntsImageParameters.from_ants_image(image=self.ls_template)
 
         # make sure points are ordered correctly
         cff_order = ["AP", "DV", "ML"]
@@ -461,7 +476,7 @@ class CoordinateTransform:
         ordered_cols = [cff_order[c] for c in swapped]
 
         # convert points into raw space
-        ants_pts = utils.convert_to_ants_space(self.ccf_template_info, ccf_pts)
+        ants_pts = utils.convert_to_ants_space(ccf_template_info, ccf_pts)
 
         template_pts = utils.apply_transforms_to_points(
             ants_pts,
@@ -475,7 +490,7 @@ class CoordinateTransform:
             invert=(False, False),
         )
 
-        raw_pts = utils.convert_from_ants_space(self.ls_template_info, raw_pts)
+        raw_pts = utils.convert_from_ants_space(ls_template_info, raw_pts)
 
         # orient axes to original image
         orient = utils.get_orientation(self.acquisition["orientation"])
