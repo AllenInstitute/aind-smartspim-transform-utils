@@ -322,10 +322,13 @@ class CoordinateTransform:
         dataset_transforms: list,
         acquisition: dict,
         image_metadata: dict,
+        ccf_transforms: dict[str, str],
+        ccf_template_path: str,
+        ls_template_path: str
     ):
-        self.ccf_transforms = _get_ccf_transforms(name)
-        self.ccf_template, self.ccf_template_info = _get_ccf_template(name)
-        self.ls_template, self.ls_template_info = _get_ls_template(name)
+        self.ccf_transforms = ccf_transforms
+        self.ccf_template, self.ccf_template_info = fio.load_ants_nifti(ccf_template_path)
+        self.ls_template, self.ls_template_info = fio.load_ants_nifti(ls_template_path)
 
         self.dataset_transforms = dataset_transforms
         self.acquisition = _parse_acquisition_data(acquisition)
