@@ -338,6 +338,7 @@ class CoordinateTransform:
         self,
         points: pd.DataFrame,
         ccf_res=25,
+        to_ccf: bool = True
     ) -> np.array:
         """
         Moves points from light sheet state space into CCFv3 space
@@ -415,25 +416,30 @@ class CoordinateTransform:
             invert=(True, False),
         )
 
-        ccf_pts = utils.apply_transforms_to_points(
-            template_pts,
-            self.ccf_transforms["points_to_ccf"],
-            invert=(True, False),
-        )
+        if to_ccf:
+            ccf_pts = utils.apply_transforms_to_points(
+                template_pts,
+                self.ccf_transforms["points_to_ccf"],
+                invert=(True, False),
+            )
 
-        ccf_pts = utils.convert_from_ants_space(
-            ccf_template_info, ccf_pts
-        )
+            ccf_pts = utils.convert_from_ants_space(
+                ccf_template_info, ccf_pts
+            )
 
-        _, swapped, _ = utils.get_orientation_transform(
-            ls_template_info.orientation,
-            ccf_template_info.orientation,
-        )
+            _, swapped, _ = utils.get_orientation_transform(
+                ls_template_info.orientation,
+                ccf_template_info.orientation,
+            )
 
-        transformed_pts = ccf_pts[:, swapped]
-        transformed_df = pd.DataFrame(
-            transformed_pts, columns=["AP", "DV", "ML"]
-        )
+            template_pts = ccf_pts[:, swapped]
+            transformed_df = pd.DataFrame(
+                template_pts, columns=["AP", "DV", "ML"]
+            )
+        else:
+            transformed_df = pd.DataFrame(
+                template_pts, columns=["ML", "AP", "DV"]
+            )
 
         return transformed_df
 
