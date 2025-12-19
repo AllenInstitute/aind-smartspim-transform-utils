@@ -338,7 +338,8 @@ class CoordinateTransform:
         self,
         points: pd.DataFrame,
         ccf_res=25,
-        to_ccf: bool = True
+        to_ccf: bool = True,
+        to_index_space: bool = False
     ) -> np.array:
         """
         Moves points from light sheet state space into CCFv3 space
@@ -423,9 +424,10 @@ class CoordinateTransform:
                 invert=(True, False),
             )
 
-            ccf_pts = utils.convert_from_ants_space(
-                ccf_template_info, ccf_pts
-            )
+            if to_index_space:
+                ccf_pts = utils.convert_from_ants_space(
+                    ccf_template_info, ccf_pts
+                )
 
             _, swapped, _ = utils.get_orientation_transform(
                 ls_template_info.orientation,
@@ -437,9 +439,10 @@ class CoordinateTransform:
                 template_pts, columns=["AP", "DV", "ML"]
             )
         else:
-            template_pts = utils.convert_from_ants_space(
-                ls_template_info, template_pts
-            )
+            if to_index_space:
+                template_pts = utils.convert_from_ants_space(
+                    ls_template_info, template_pts
+                )
             transformed_df = pd.DataFrame(
                 template_pts, columns=["ML", "AP", "DV"]
             )
