@@ -8,6 +8,7 @@ Created on Wed May 28 16:21:46 2025
 import json
 import os
 from glob import glob
+from typing import Optional
 
 import ants
 import numpy as np
@@ -322,7 +323,7 @@ class CoordinateTransform:
         dataset_transforms: list,
         acquisition: dict,
         image_metadata: dict,
-        ccf_transforms: dict[str, str],
+        ccf_transforms: Optional[dict[str, str]] = None,
         ccf_template_path: str,
         ls_template_path: str
     ):
@@ -359,6 +360,8 @@ class CoordinateTransform:
             array of points in CCFv3 space
 
         """
+        if to_ccf and self.ccf_transforms is None:
+            raise ValueError('provide ccf_transforms if to_ccf')
         ccf_template_info = AntsImageParameters.from_ants_image(image=self.ccf_template)
         ls_template_info = AntsImageParameters.from_ants_image(image=self.ls_template)
 
