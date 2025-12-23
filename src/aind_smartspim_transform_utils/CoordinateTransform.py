@@ -323,12 +323,16 @@ class CoordinateTransform:
         dataset_transforms: list,
         acquisition: dict,
         image_metadata: dict,
+        ls_template_path: str,
+        ccf_template_path: Optional[str] = None,
         ccf_transforms: Optional[dict[str, str]] = None,
-        ccf_template_path: str,
-        ls_template_path: str
     ):
         self.ccf_transforms = ccf_transforms
-        self.ccf_template, self.ccf_template_info = fio.load_ants_nifti(ccf_template_path)
+
+        if ccf_template_path is not None:
+            self.ccf_template, self.ccf_template_info = fio.load_ants_nifti(ccf_template_path)
+        else:
+            self.ccf_template, self.ccf_template_info = None, None
         self.ls_template, self.ls_template_info = fio.load_ants_nifti(ls_template_path)
 
         self.dataset_transforms = dataset_transforms
@@ -362,7 +366,8 @@ class CoordinateTransform:
         """
         if to_ccf and self.ccf_transforms is None:
             raise ValueError('provide ccf_transforms if to_ccf')
-        ccf_template_info = AntsImageParameters.from_ants_image(image=self.ccf_template)
+        if to_ccf and self.ccf_template is None:
+            raise ValueError('provide ccf template path if to_ccf')
         ls_template_info = AntsImageParameters.from_ants_image(image=self.ls_template)
 
         # order columns to align with imaging
@@ -421,6 +426,7 @@ class CoordinateTransform:
         )
 
         if to_ccf:
+            ccf_template_info = AntsImageParameters.from_ants_image(image=self.ccf_template)
             ccf_pts = utils.apply_transforms_to_points(
                 template_pts,
                 self.ccf_transforms["points_to_ccf"],
