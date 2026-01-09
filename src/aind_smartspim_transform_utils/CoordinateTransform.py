@@ -463,6 +463,10 @@ class CoordinateTransform:
                 template_pts = utils.convert_from_ants_space(
                     ls_template_info, template_pts
                 )
+                if return_input_points_in_ls_template_space:
+                    ants_pts = utils.convert_from_ants_space(
+                        ls_template_info, ants_pts
+                    )
             transformed_df = pd.DataFrame(
                 template_pts, columns=["ML", "AP", "DV"]
             )
