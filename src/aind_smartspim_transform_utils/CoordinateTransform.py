@@ -344,7 +344,8 @@ class CoordinateTransform:
         points: pd.DataFrame,
         ccf_res=25,
         to_ccf: bool = True,
-        to_index_space: bool = False
+        to_index_space: bool = False,
+        return_input_points_in_ls_template_space: bool = False
     ) -> np.array:
         """
         Moves points from light sheet state space into CCFv3 space
@@ -357,12 +358,16 @@ class CoordinateTransform:
             dask array of the image that the points were annotated on
         ccf_res: int
             The resolution of the ccf used in registration
+        return_input_points_in_ls_template_space: bool
+            Whether to return the input points in light sheet template space in physical units
 
         Returns
         -------
         transformed_pts : np.array
             array of points in CCFv3 space
 
+        optionally, returns ants_pts: np.array
+            array of points in light sheet space in physical units (no transformations applied)
         """
         if to_ccf and self.ccf_transforms is None:
             raise ValueError('provide ccf_transforms if to_ccf')
@@ -456,7 +461,10 @@ class CoordinateTransform:
                 template_pts, columns=["ML", "AP", "DV"]
             )
 
-        return transformed_df
+        if return_input_points_in_ls_template_space:
+            return transformed_df, ants_pts
+        else:
+            return transformed_df
 
     def reverse_transform(
         self,
