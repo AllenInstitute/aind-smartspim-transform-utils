@@ -345,7 +345,8 @@ class CoordinateTransform:
         ccf_res=25,
         to_ccf: bool = True,
         to_index_space: bool = False,
-        return_input_points_in_ls_template_space: bool = False
+        return_input_points_in_ls_template_space: bool = False,
+        affine_only: bool = False,
     ) -> np.array:
         """
         Moves points from light sheet state space into CCFv3 space
@@ -360,6 +361,8 @@ class CoordinateTransform:
             The resolution of the ccf used in registration
         return_input_points_in_ls_template_space: bool
             Whether to return the input points in light sheet template space in physical units
+        affine_only: bool
+            Whether to apply only the affine transform
 
         Returns
         -------
@@ -424,10 +427,13 @@ class CoordinateTransform:
             ls_template_info, orient_pts
         )
 
+        transforms = [self.dataset_transforms["points_to_ccf"][0]] if affine_only else self.dataset_transforms["points_to_ccf"]
+        invert = (True,) if affine_only else (True, False)
+
         template_pts = utils.apply_transforms_to_points(
             ants_pts,
-            self.dataset_transforms["points_to_ccf"],
-            invert=(True, False),
+            transforms=transforms,
+            invert=invert,
         )
 
         if to_ccf:
