@@ -337,7 +337,7 @@ class CoordinateTransform:
 
         self.dataset_transforms = dataset_transforms
         self.acquisition = _parse_acquisition_data(acquisition)
-        self.zarr_shape = image_metadata["shape"]
+        self.registered_shape = image_metadata["registered_shape"]
 
     def forward_transform(
         self,
@@ -390,11 +390,9 @@ class CoordinateTransform:
         points_ds = points.values / 2**reg_ds
 
         # get dimensions of registered image for orienting points
-        input_shape = self.zarr_shape
-        if len(input_shape) == 5:
-            input_shape = input_shape[2:]
-
-        reg_dims = [dim / 2**reg_ds for dim in input_shape]
+        reg_dims = self.registered_shape
+        if len(reg_dims) == 5:
+            reg_dims = reg_dims[2:]
 
         # flip axis based on the template orientation relative to input image
         orient = utils.get_orientation(self.acquisition["orientation"])
@@ -408,7 +406,7 @@ class CoordinateTransform:
                 points_ds[:, idx] = reg_dims[idx] - points_ds[:, idx]
 
         image_res = [
-            float(dim["resolution"]) for dim in self.acquisition["orientation"]
+            float(dim["resolution"]) for dim in sorted(self.acquisition["orientation"], key=lambda x: x["dimension"])
         ]
 
         # scale points and orient axes to template
@@ -556,11 +554,9 @@ class CoordinateTransform:
         scaled_pts = utils.scale_points(orient_pts, scaling)
 
         # get dimensions of registered image for orienting points
-        input_shape = self.zarr_shape
-        if len(input_shape) == 5:
-            input_shape = input_shape[2:]
-
-        reg_dims = [dim / 2**reg_ds for dim in input_shape]
+        reg_dims = self.registered_shape
+        if len(reg_dims) == 5:
+            reg_dims = reg_dims[2:]
 
         for idx, dim_orient in enumerate(mat.sum(axis=0)):
             if dim_orient < 0:
