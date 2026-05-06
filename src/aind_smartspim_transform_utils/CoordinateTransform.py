@@ -478,6 +478,8 @@ class CoordinateTransform:
         self,
         points: pd.DataFrame,
         ccf_res=25,
+        return_input_points_in_ls_template_space: bool = False,
+        include_subject: bool = False,
     ) -> np.array:
         """
         Moves points from CCFv3 space into light sheet state space.
@@ -489,7 +491,8 @@ class CoordinateTransform:
             have column names defined as 'ML', 'AP', and 'DV'
         ccf_res: int
             The resolution of the ccf used in registration
-
+        include_subject: Map from CCF -> Light sheet template -> subject
+            If false just maps CCF -> Light sheet template
         Returns
         -------
         transformed_pts : np.array
@@ -521,50 +524,59 @@ class CoordinateTransform:
             invert=(False, False),
         )
 
-        raw_pts = utils.apply_transforms_to_points(
-            template_pts,
-            self.dataset_transforms["points_from_ccf"],
-            invert=(False, False),
-        )
+        if include_subject:
+            raw_pts = utils.apply_transforms_to_points(
+                template_pts,
+                self.dataset_transforms["points_from_ccf"],
+                invert=(False, False),
+            )
 
-        raw_pts = utils.convert_from_ants_space(ls_template_info, raw_pts)
+            raw_pts = utils.convert_from_ants_space(ls_template_info, raw_pts)
 
-        # orient axes to original image
-        orient = utils.get_orientation(self.acquisition["orientation"])
+            # orient axes to original image
+            orient = utils.get_orientation(self.acquisition["orientation"])
 
-        _, swapped, mat = utils.get_orientation_transform(
-            self.ls_template_info["orientation"], orient
-        )
+            _, swapped, mat = utils.get_orientation_transform(
+                self.ls_template_info["orientation"], orient
+            )
 
-        orient_pts = raw_pts[:, swapped]
-        ordered_cols = [ordered_cols[c] for c in swapped]
+            orient_pts = raw_pts[:, swapped]
+            ordered_cols = [ordered_cols[c] for c in swapped]
 
-        # scale points
-        image_res = [
-            float(dim["resolution"]) for dim in self.acquisition["orientation"]
-        ]
+            # scale points
+            image_res = [
+                float(dim["resolution"]) for dim in sorted(self.acquisition["orientation"], key=lambda x: x["dimension"])
+            ]
 
-        scaling = utils.calculate_scaling(
-            image_res=image_res,
-            downsample=2**reg_ds,
-            ccf_res=ccf_res,
-            direction="reverse",
-        )
+            scaling = utils.calculate_scaling(
+                image_res=image_res,
+                downsample=2**reg_ds,
+                ccf_res=ccf_res,
+                direction="reverse",
+            )
 
-        scaled_pts = utils.scale_points(orient_pts, scaling)
+            scaled_pts = utils.scale_points(orient_pts, scaling)
 
-        # get dimensions of registered image for orienting points
-        reg_dims = self.registered_shape
-        if len(reg_dims) == 5:
-            reg_dims = reg_dims[2:]
+            # get dimensions of registered image for orienting points
+            reg_dims = self.registered_shape
+            if len(reg_dims) == 5:
+                reg_dims = reg_dims[2:]
 
-        for idx, dim_orient in enumerate(mat.sum(axis=0)):
-            if dim_orient < 0:
-                scaled_pts[:, idx] = reg_dims[idx] - scaled_pts[:, idx]
+            for idx, dim_orient in enumerate(mat.sum(axis=0)):
+                if dim_orient < 0:
+                    scaled_pts[:, idx] = reg_dims[idx] - scaled_pts[:, idx]
 
-        # upsample points from registration to raw image space
-        transformed_pts = scaled_pts * 2**reg_ds
+            # upsample points from registration to raw image space
+            transformed_pts = scaled_pts * 2**reg_ds
 
-        transformed_df = pd.DataFrame(transformed_pts, columns=ordered_cols)
+            transformed_df = pd.DataFrame(transformed_pts, columns=ordered_cols)
+        else:
+            transformed_df = None
 
-        return transformed_df
+        if return_input_points_in_ls_template_space:
+            template_pts = utils.convert_from_ants_space(
+                ls_template_info, template_pts
+            )
+            # # convert RAL -> RAS
+            # template_pts[:, 2] = 576 - template_pts[:, 2]
+        return transformed_df, template_pts
